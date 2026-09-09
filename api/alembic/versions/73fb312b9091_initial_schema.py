@@ -51,10 +51,13 @@ def upgrade() -> None:
     sa.Column('name_ar', sa.String(length=255), nullable=False),
     sa.Column('name_en', sa.String(length=255), nullable=False),
     sa.Column('starts_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('ends_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('ends_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('status', sa.Enum('draft', 'active', 'closed', name='event_status'), nullable=False),
     sa.Column('qr_token', sa.String(length=64), nullable=False),
-    sa.Column('retention_until', sa.DateTime(timezone=True), nullable=True),
+    # No server_default: computed at INSERT time from ends_at + privacy_mode
+    # (see Event._default_retention_until) so it stays overridable, not a
+    # DB-enforced formula.
+    sa.Column('retention_until', sa.DateTime(timezone=True), nullable=False),
     sa.Column('consent_text_ar', sa.Text(), nullable=False),
     sa.Column('consent_text_en', sa.Text(), nullable=False),
     sa.Column('privacy_mode', sa.Enum('standard', 'strict', name='privacy_mode'), nullable=False),

@@ -31,12 +31,18 @@ def make_event(db: Session, org: Organization | None = None, **kwargs) -> Event:
         name_ar=kwargs.get("name_ar", "حدث تجريبي"),
         name_en=kwargs.get("name_en", "Test Event"),
         status=kwargs.get("status", EventStatus.active),
+        # ends_at is NOT NULL (retention_until's default is computed from
+        # it) -- default here to "4 hours from now", a plausible single-day
+        # event, unless the test cares and overrides it.
+        ends_at=kwargs.get("ends_at", now_utc() + timedelta(hours=4)),
         consent_text_ar=kwargs.get("consent_text_ar", "نص الموافقة"),
         consent_text_en=kwargs.get("consent_text_en", "Consent text"),
         privacy_mode=kwargs.get("privacy_mode", PrivacyMode.standard),
         match_mode=kwargs.get("match_mode", MatchMode.face),
         auto_publish=kwargs.get("auto_publish", True),
     )
+    if "retention_until" in kwargs:
+        event.retention_until = kwargs["retention_until"]
     db.add(event)
     db.flush()
     return event

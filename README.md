@@ -88,7 +88,8 @@ laqta/
 │   ├── scripts/
 │   │   ├── embed_folder.py      # CLI: detect+embed a folder, dump JSON
 │   │   ├── purge.py               # CLI: run_purge(), --dry-run supported
-│   │   └── seed.py                  # CLI: demo org+event, ingest a folder
+│   │   ├── purge_scheduler.py       # long-running: enqueues purge on a timer
+│   │   └── seed.py                    # CLI: demo org+event, ingest a folder
 │   └── tests/
 └── web/                      # Next.js app — not scaffolded yet
 ```
@@ -100,9 +101,18 @@ laqta/
 - `organizations` — `account_type`: `organizer` | `photographer`
 - `users` — `role`: `owner` | `staff` | `photographer` | `moderator`
 - `events` — `privacy_mode` (`standard`|`strict`), `match_mode` (`face`|`code`|`both`),
-  `auto_publish`, `retention_until`, bilingual consent text, `qr_token`.
-  A **check constraint** forces `auto_publish = false` whenever
-  `privacy_mode = 'strict'` — enforced again in the API layer once it exists.
+  `auto_publish`, bilingual consent text, `qr_token`. A **check constraint**
+  forces `auto_publish = false` whenever `privacy_mode = 'strict'` — enforced
+  again at the API layer too (`app/api/routes/match.py` only ever surfaces
+  `published` photos).
+  `ends_at` and `retention_until` are both **NOT NULL**: `retention_until`
+  defaults (at insert time, overridable) to `ends_at` + `STRICT_RETENTION_DAYS`
+  (7) or `STANDARD_RETENTION_DAYS` (30) depending on `privacy_mode` — a
+  nullable `retention_until` is exactly how an event would silently become
+  permanently unpurgeable (the purge job's `WHERE retention_until < now()`
+  simply never matches `NULL`, no error, no warning). See
+  `app/models/event.py`'s `_default_retention_until` and
+  `tests/test_event_retention_defaults.py`.
 - `photographers` — scoped to an org; `ftp_username`/`ftp_password_hash` are
   reserved for the Phase 2 FTPS ingest path, unused for now.
 - `photos` — `status` (`pending`|`processing`|`ready`|`failed`), `published`
@@ -371,8 +381,8 @@ python scripts/purge.py             # actually deletes
 ```
 
 `app.workers.purge.run_purge()` (RQ job `app.workers.jobs.purge_expired_data`,
-on the `purge` queue already wired up in `docker-compose.yml`'s worker
-command — see "Not wired up yet" below):
+on the `purge` queue consumed by `docker-compose.yml`'s `worker` service, fed
+by the `purge-scheduler` service — see "Scheduling" below):
 
 1. **`guest_faces`**: hard `DELETE` every row where `expires_at < now()`.
    Never a soft-delete flag — a purged row leaves no recoverable vector,
@@ -400,19 +410,41 @@ command — see "Not wired up yet" below):
    sees the lock held, logs it, and exits immediately rather than piling up
    waiting or racing the first run on the same rows.
 5. **Idempotent**: an event with nothing left to delete (already purged, or
-   never had data) is silently skipped — no audit_log noise, no error, safe
-   to run as often as you like. `tests/test_purge.py` covers all of this,
-   including seeding both expired and live data and asserting the live data
-   is untouched, and a real (non-mocked) end-to-end run that uploads actual
-   objects to MinIO and confirms they're actually gone afterward, not just
-   that the DB rows are.
+   never had data) is silently skipped from the per-event detail — no error,
+   safe to run as often as you like. `tests/test_purge.py` covers all of
+   this, including seeding both expired and live data and asserting the
+   live data is untouched, and a real (non-mocked) end-to-end run that
+   uploads actual objects to MinIO and confirms they're actually gone
+   afterward, not just that the DB rows are.
+6. **Proof it ran**: every real (non-dry-run) invocation writes one
+   unconditional `audit_log` row (`action='purge_run'`, counts included)
+   *even when nothing was deleted*. Without this, a scheduler that's
+   silently stopped firing looks identical to one running daily and
+   finding nothing to do — both leave zero trace otherwise. This is what
+   actually lets anyone confirm retention is being enforced, not just that
+   the code to enforce it exists.
 
-**Not wired up yet**: actual periodic *scheduling*. `purge_expired_data` is
-enqueueable and the `purge` RQ queue exists, but nothing currently calls
-`queue.enqueue(purge_expired_data)` on a timer — that needs `rq-scheduler`,
-a host crontab calling `scripts/purge.py`, or whatever the eventual
-deployment platform's scheduled-job feature is. This is infrastructure, not
-logic, and is a reasonable next step before relying on this in production.
+### Scheduling
+
+`docker-compose.yml`'s `purge-scheduler` service (`scripts/purge_scheduler.py`)
+enqueues `purge_expired_data` onto the `purge` queue every
+`PURGE_INTERVAL_SECONDS` (default 86400 = daily) — the existing `worker`
+service actually runs it, same as any other job. Verified for real: ran
+both containers with a 15s interval, watched the worker log each
+`purge_expired_data` execution, and confirmed `audit_log` picked up a
+`purge_run` row for every single one.
+
+This is an **interval loop, not wall-clock cron** — it enqueues once at
+container start and then every `PURGE_INTERVAL_SECONDS` after that, so the
+time of day it actually fires drifts across container restarts. That's a
+deliberate simplicity tradeoff for Phase 1, not an oversight: real cron
+inside a container has its own gotchas (stdout not reaching Docker's log
+stream without explicit redirection, timezone configuration, foreground-mode
+signal handling), and `rq-scheduler`'s `.cron()` adds a dependency and a
+registration-idempotency question (re-registering on every restart without
+producing duplicate schedules). If wall-clock-fixed daily timing matters
+later, swap `purge_scheduler.py`'s loop for either — `app.workers.purge.run_purge`
+itself doesn't change.
 
 ## Seed script
 

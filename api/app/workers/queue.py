@@ -18,3 +18,7 @@ def get_redis() -> Redis:
 
 def get_photo_processing_queue() -> Queue:
     return Queue(PHOTO_PROCESSING_QUEUE, connection=get_redis())
+
+
+def get_purge_queue() -> Queue:
+    return Queue(PURGE_QUEUE, connection=get_redis())

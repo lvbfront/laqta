@@ -176,6 +176,49 @@ def test_purge_is_idempotent_second_run_finds_nothing(db_session):
     assert second.guest_faces_deleted == 0
 
 
+def test_purge_run_always_logged_even_when_nothing_was_deleted(db_session):
+    # No expired data seeded at all -- this is the "scheduler fired, found
+    # nothing to do" case. Proof the scheduler is actually running depends
+    # on this leaving a trace regardless; a purge that silently no-ops is
+    # indistinguishable from a scheduler that's stopped firing without it.
+    report = run_purge(db=db_session, dry_run=False)
+
+    assert report.ran is True
+    assert report.guest_faces_deleted == 0
+    assert report.events == []
+
+    entries = db_session.query(AuditLog).filter(AuditLog.action == "purge_run").all()
+    assert len(entries) == 1
+    assert entries[0].meta["guest_faces_deleted"] == 0
+    assert entries[0].meta["events_purged"] == 0
+    assert entries[0].meta["event_ids"] == []
+
+
+def test_purge_run_log_reflects_actual_deletions(db_session):
+    org = make_organization(db_session)
+    event = make_event(db_session, org)
+    event.retention_until = now_utc() - timedelta(days=1)
+    db_session.flush()
+    make_photo(db_session, event)
+    guest = _make_guest(db_session, event, "tok-run-log")
+    db_session.add(GuestFace(guest_id=guest.id, embedding=[0.06] * 512, expires_at=now_utc() - timedelta(days=1)))
+    db_session.flush()
+
+    with patch("app.workers.purge.minio_client.delete_objects", return_value=[]):
+        report = run_purge(db=db_session, dry_run=False)
+
+    run_entries = db_session.query(AuditLog).filter(AuditLog.action == "purge_run").all()
+    assert len(run_entries) == 1
+    assert run_entries[0].meta["guest_faces_deleted"] == 1
+    assert run_entries[0].meta["events_purged"] == 1
+    assert run_entries[0].meta["event_ids"] == [str(report.events[0].event_id)]
+
+    # Dry runs remain fully read-only -- no purge_run entry either.
+    with patch("app.workers.purge.minio_client.delete_objects") as mock_delete:
+        run_purge(db=db_session, dry_run=True)
+    mock_delete.assert_not_called()
+
+
 def test_advisory_lock_prevents_concurrent_purge_runs(db_session, engine):
     from sqlalchemy import text
 

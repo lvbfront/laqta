@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     minio_bucket: str = "laqta-photos"
     minio_secure: bool = False
     signed_url_ttl_seconds: int = 300
+    # How often scripts/purge_scheduler.py enqueues a purge run. This is an
+    # interval loop (run once at start, then every N seconds), not
+    # wall-clock cron -- the time of day it fires drifts with container
+    # restarts. Default 86400 (daily). See docker-compose.yml's
+    # purge-scheduler service and the README's "Purge job" section.
+    purge_interval_seconds: int = 86400
 
     # --- Matching / face pipeline ---
     match_threshold: float = 0.38

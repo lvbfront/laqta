@@ -81,7 +81,9 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://laqta:laqta_dev_password@postgres:5432/laqta}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
-    # Job implementations land in app/workers (photo processing pipeline, purge job).
+    # Consumes both queues: photo_processing (app.workers.jobs.process_photo,
+    # enqueued by the ingest API) and purge (app.workers.jobs.purge_expired_data,
+    # enqueued on a timer by the purge-scheduler service below).
     command: rq worker -u ${REDIS_URL:-redis://redis:6379/0} photo_processing purge
     volumes:
       - ./api:/app
@@ -92,6 +94,31 @@ services:
       redis:
         condition: service_healthy
       minio:
+        condition: service_healthy
+
+  purge-scheduler:
+    build:
+      context: ./api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://laqta:laqta_dev_password@postgres:5432/laqta}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+    # Timing only -- enqueues onto the purge queue every PURGE_INTERVAL_SECONDS
+    # (default daily); the worker service actually runs the job. Without
+    # this service nothing ever enqueues a purge run on its own, so
+    # retention is unenforced no matter how correct app/workers/purge.py
+    # is. See scripts/purge_scheduler.py and the README's "Purge job"
+    # section for why this is an interval loop, not wall-clock cron.
+    command: python scripts/purge_scheduler.py
+    volumes:
+      - ./api:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
 volumes:

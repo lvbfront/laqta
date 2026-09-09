@@ -136,9 +136,10 @@ def run_purge(*, db: Session | None = None, dry_run: bool = False) -> PurgeRepor
             expired_faces = db.query(GuestFace).filter(GuestFace.expires_at < now).all()
             guest_faces_count = len(expired_faces)
 
-            expired_events = (
-                db.query(Event).filter(Event.retention_until.isnot(None), Event.retention_until < now).all()
-            )
+            # retention_until is NOT NULL (see app/models/event.py) -- no
+            # IS NOT NULL guard needed; every event is eligible for this
+            # comparison, not just ones that happened to have a value set.
+            expired_events = db.query(Event).filter(Event.retention_until < now).all()
 
             event_results = [
                 result
@@ -162,6 +163,27 @@ def run_purge(*, db: Session | None = None, dry_run: bool = False) -> PurgeRepor
                 db.query(GuestFace).filter(GuestFace.expires_at < now).delete(synchronize_session=False)
 
             if not dry_run:
+                # Unconditional -- one row per invocation, even (especially)
+                # when nothing was deleted. Without this, a scheduler that's
+                # silently stopped firing looks identical to one firing
+                # daily and finding nothing to do: both leave zero trace.
+                # This is what actually lets anyone confirm retention is
+                # being enforced, not just that the code to enforce it
+                # exists. The per-category entries above are additional
+                # detail, not a substitute -- they only appear when there
+                # was something to report.
+                db.add(
+                    AuditLog(
+                        actor="system:purge",
+                        action="purge_run",
+                        subject="system",
+                        meta={
+                            "guest_faces_deleted": guest_faces_count,
+                            "events_purged": len(event_results),
+                            "event_ids": [str(r.event_id) for r in event_results],
+                        },
+                    )
+                )
                 db.commit()
             # dry_run performs no db.add()/.delete() at all above (see the
             # early return in _purge_event and the `not dry_run` guard on

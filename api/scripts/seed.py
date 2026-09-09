@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -70,6 +71,10 @@ def main() -> None:
             name_ar=args.event_name_ar,
             name_en=args.event_name_en,
             status=EventStatus.active,
+            # ends_at is required -- retention_until's default (7 or 30
+            # days out, by privacy_mode) is computed from it. A demo event
+            # "ends" 4 hours from now, a plausible single-day event.
+            ends_at=datetime.now(timezone.utc) + timedelta(hours=4),
             consent_text_ar="بموافقتك، سنستخدم صورة وجهك مؤقتًا للعثور على صورك في هذا الحدث.",
             consent_text_en="By consenting, we'll briefly use your face to find your photos from this event.",
             privacy_mode=privacy_mode,
