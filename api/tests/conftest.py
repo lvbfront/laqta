@@ -61,8 +61,14 @@ def engine():
 @pytest.fixture()
 def db_session(engine):
     """One test = one transaction, rolled back at the end. FK cascades and
-    check constraints all fire normally within that transaction -- no
-    commit is needed to observe their effects.
+    check constraints all fire normally within that transaction. Calling
+    session.commit() is also safe here and does *not* leak data past the
+    fixture: SQLAlchemy 2.0's default join_transaction_mode
+    ('conditional_savepoint') makes an inner commit release a SAVEPOINT
+    rather than the outer transaction this fixture controls, so route code
+    under test (which must call real commit()s) works unmodified against
+    this fixture -- verified empirically, not just assumed, before relying
+    on it for tests/test_ingest_photos.py.
     """
     connection = engine.connect()
     trans = connection.begin()
@@ -74,3 +80,26 @@ def db_session(engine):
         session.close()
         trans.rollback()
         connection.close()
+
+
+@pytest.fixture()
+def client(db_session):
+    """TestClient wired to the same rollback-isolated session as
+    db_session, via a get_db dependency override -- every request in a
+    test, and any direct db_session assertions in that same test, share
+    one transaction that's rolled back at the end.
+    """
+    from fastapi.testclient import TestClient
+
+    from app.db import get_db
+    from app.main import app
+
+    def _override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = _override_get_db
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.clear()

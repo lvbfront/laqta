@@ -18,9 +18,14 @@ arm64 Docker image, not just a host venv):
   Postgres 16 + pgvector instance.
 - Worker pipeline: pyvips thumbnailing/watermarking/EXIF, buffalo_l face
   detection + alignment + embedding, quality gating.
+- Ingest API: `POST /api/events/{event_id}/photos`, batch multipart upload,
+  per-event MD5 dedupe, enqueues the worker job. Verified end-to-end against
+  real Postgres/Redis/MinIO, including running the worker job synchronously
+  against a real ingested photo and confirming the full chain: raw upload →
+  `status='ready'`, 6/6 faces detected, thumbnail/preview written, original
+  overwritten with an EXIF-free re-encode.
 
-Not built yet: the ingest API (so nothing enqueues worker jobs yet), match API,
-delivery API, purge job, frontend, seed script.
+Not built yet: match API, delivery API, purge job, frontend, seed script.
 
 ## Repo layout
 
@@ -40,7 +45,9 @@ laqta/
 │   │   ├── config.py            # Settings, from env vars
 │   │   ├── db.py                  # SQLAlchemy engine/session/Base
 │   │   ├── models/                  # one file per table (see below)
-│   │   ├── api/routes/                # empty — ingest/match/delivery land here
+│   │   ├── api/routes/
+│   │   │   └── photos.py                # ingest: POST /api/events/{id}/photos
+│   │   │                                # (match/delivery/moderation land here next)
 │   │   ├── workers/
 │   │   │   ├── pipeline.py              # pure: bytes in, derivatives+faces out
 │   │   │   ├── jobs.py                    # RQ job: DB + MinIO orchestration
@@ -217,32 +224,62 @@ every pair of gated faces in the folder, sorted descending — the direct input
 for eyeballing where same-person vs. different-person scores separate before
 committing to `MATCH_THRESHOLD`.
 
+## Ingest API
+
+`POST /api/events/{event_id}/photos` — multipart, `files` (repeatable field,
+batch upload). Returns 201 immediately with a per-file status; **no image
+processing happens in the request handler** — cameras send bursts and the
+response has to stay fast:
+
+1. 404 if the event doesn't exist.
+2. Per file: read bytes, MD5 hash, check for an existing `(event_id, md5)` row
+   (fast-path dedupe) — insert a `pending` `photos` row, upload the raw bytes
+   to MinIO at `events/{event_id}/photos/{photo_id}/original.jpg`, commit,
+   enqueue `app.workers.jobs.process_photo` on the `photo_processing` RQ
+   queue. One file's failure (bad upload, race-lost dedupe caught via the
+   `uq_photos_event_md5` `IntegrityError`) doesn't sink the rest of the batch
+   — each file gets its own try/except and its own row in the response.
+3. Response: `{"results": [{"filename", "status": "queued"|"duplicate"|"error",
+   "photo_id"?, "duplicate_of"?, "error"?}, ...]}`.
+
+Dedupe is enforced twice on purpose: a pre-check query (avoids a wasted MinIO
+upload in the common case) and the DB unique constraint (`try: db.flush()
+except IntegrityError`, which is what actually holds under two near-
+simultaneous uploads of the same file — see `tests/test_ingest_photos.py`).
+
+No auth on this endpoint yet — Phase 2 introduces per-event FTPS/photographer
+credentials; there's nothing to check against yet in Phase 1.
+
 ## Environment variables
 
 See [`.env.example`](.env.example) for the full, current list (Postgres/Redis/MinIO
 connection settings, `MATCH_THRESHOLD`, `GUEST_FACE_RETENTION_DAYS`, face-pipeline
-tuning). This section will be expanded as the ingest/match/delivery APIs land.
+tuning). This section will be expanded as the match/delivery APIs land.
 
 ## Running tests
 
-Tests run against a real Postgres + pgvector database (UUID/vector/enum types
-aren't meaningfully testable against SQLite). `tests/conftest.py` will create
-the test database if it doesn't exist, drop and recreate its schema, and run
-Alembic migrations against it every session — point it at a *disposable*
-database, never at dev data.
+Tests run against real backends — Postgres + pgvector (UUID/vector/enum types
+aren't meaningfully testable against SQLite), Redis, and MinIO. `tests/conftest.py`
+will create the test database if it doesn't exist, drop and recreate its
+schema, and run Alembic migrations against it every session — point
+`TEST_DATABASE_URL` at a *disposable* database, never at dev data. The
+`client` fixture (for API route tests) reuses the same rollback-isolated
+session as `db_session` via a `get_db` dependency override, so route code
+that calls a real `.commit()` still leaves no trace after the test.
 
 ```bash
 cd api
 source .venv/bin/activate
-docker compose up -d postgres   # if not already running
+docker compose up -d postgres redis minio   # if not already running
 TEST_DATABASE_URL=postgresql+psycopg://laqta:laqta_dev_password@localhost:5432/laqta_test \
   pytest tests/ -v
 ```
 
-`TEST_DATABASE_URL` defaults to `laqta_test` on `localhost:5432` if unset.
+`TEST_DATABASE_URL` defaults to `laqta_test` on `localhost:5432` if unset; Redis/MinIO
+settings come from the same env vars the app uses (see `.env.example`).
 
 ## Next up
 
-Ingest API (`POST /api/events/{event_id}/photos`) — MD5 dedupe, write the
-original to MinIO, create the `photos` row, enqueue `app.workers.jobs.process_photo`.
-Then match API, delivery API, purge job, frontend, seed script.
+Match API (`POST /api/events/{event_id}/match`): selfie quality gate, embed,
+`app.services.face_search.search_faces`, group by photo, create `guests` +
+`guest_faces`. Then delivery API, purge job, frontend, seed script.
