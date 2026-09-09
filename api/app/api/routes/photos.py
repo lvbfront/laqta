@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from typing import Annotated
+from datetime import datetime, timezone
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db import get_db
+from app.models.audit_log import AuditLog
 from app.models.enums import PhotoStatus
 from app.models.event import Event
 from app.models.photo import Photo
@@ -106,3 +109,92 @@ async def upload_photos(
             results.append(PhotoUploadResult(filename=filename, status="error", error=str(exc)))
 
     return PhotoBatchUploadResponse(results=results)
+
+
+class PhotoListItem(BaseModel):
+    id: uuid.UUID
+    status: str
+    published: bool
+    thumbnail_url: str | None
+    created_at: datetime
+
+
+@router.get("", response_model=list[PhotoListItem])
+def list_photos(
+    event_id: uuid.UUID,
+    db: Annotated[Session, Depends(get_db)],
+    status: str | None = None,
+) -> list[PhotoListItem]:
+    """Dashboard-side listing (photo grid, moderation queue). No guest
+    scoping here -- this is organizer tooling, not the guest-facing match
+    results, and Phase 1 has no auth to further gate it behind (see
+    app/api/routes/events.py's note on the dashboard's single implicit
+    org). `?status=pending` is what the moderation queue uses.
+    """
+    event = db.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail={"code": "event_not_found", "message": "Event not found."})
+
+    query = db.query(Photo).filter(Photo.event_id == event_id)
+    if status:
+        query = query.filter(Photo.status == status)
+    photos = query.order_by(Photo.created_at.desc()).limit(500).all()
+
+    items = []
+    for photo in photos:
+        thumb_url = (
+            minio_client.presigned_get_url(photo.s3_key_thumbnail, settings.signed_url_ttl_seconds)
+            if photo.s3_key_thumbnail
+            else None
+        )
+        items.append(
+            PhotoListItem(
+                id=photo.id,
+                status=photo.status.value,
+                published=photo.published,
+                thumbnail_url=thumb_url,
+                created_at=photo.created_at,
+            )
+        )
+    return items
+
+
+class ModerationResult(BaseModel):
+    id: uuid.UUID
+    status: str
+    published: bool
+
+
+@router.post("/{photo_id}/moderate", response_model=ModerationResult)
+def moderate_photo(
+    event_id: uuid.UUID,
+    photo_id: uuid.UUID,
+    db: Annotated[Session, Depends(get_db)],
+    action: Literal["approve", "reject"],
+) -> ModerationResult:
+    """No auth (see app/api/routes/events.py) -- `actor` in the audit_log
+    entry is a fixed placeholder rather than a real user id, since there
+    is no logged-in user to attribute this to yet.
+    """
+    photo = db.query(Photo).filter(Photo.id == photo_id, Photo.event_id == event_id).first()
+    if photo is None:
+        raise HTTPException(status_code=404, detail={"code": "photo_not_found", "message": "Photo not found."})
+    if photo.status != PhotoStatus.ready:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "photo_not_ready", "message": "Photo hasn't finished processing yet."},
+        )
+
+    photo.published = action == "approve"
+    photo.moderated_at = datetime.now(timezone.utc)
+    db.add(
+        AuditLog(
+            actor="dashboard:unauthenticated",
+            action=f"moderate_{action}",
+            subject=f"photo:{photo.id}",
+            meta={"event_id": str(event_id)},
+        )
+    )
+    db.commit()
+
+    return ModerationResult(id=photo.id, status=photo.status.value, published=photo.published)

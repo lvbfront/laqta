@@ -3,9 +3,10 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.formparsers import MultiPartParser
 
-from app.api.routes import delivery, match, photos
+from app.api.routes import delivery, events, match, photos
 from app.config import settings
 from app.storage import minio_client
 
@@ -78,6 +79,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# The Next.js dev server runs natively on the host (not in Docker, see
+# CLAUDE.md), on a different origin/port than the API -- browser requests
+# from it are cross-origin. Phase 1 has no auth/cookies to protect here
+# (see app/api/routes/events.py), so a permissive dev-only CORS policy is
+# the pragmatic choice, not a hardened one; tighten this to an explicit
+# origin allowlist before this is ever exposed beyond localhost.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/health")
 def health() -> dict[str, str]:
@@ -87,8 +101,8 @@ def health() -> dict[str, str]:
 app.include_router(photos.router)
 app.include_router(match.router)
 app.include_router(delivery.router)
+app.include_router(events.router)
 
 # Routers land here as they're implemented:
-# from app.api.routes import events, moderation
-# app.include_router(events.router)
+# from app.api.routes import moderation
 # app.include_router(moderation.router)
