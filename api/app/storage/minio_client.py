@@ -44,18 +44,24 @@ def download_bytes(key: str) -> bytes:
     return response["Body"].read()
 
 
-def presigned_get_url(key: str, expires_in_seconds: int) -> str:
+def presigned_get_url(
+    key: str, expires_in_seconds: int, *, download_filename: str | None = None
+) -> str:
     """Short-TTL signed URL for direct guest download from MinIO/S3 -- the
     API never proxies the bytes itself. Access control happens before this
     is ever called (app.api.routes.delivery checks the guest has an actual
     Match to the photo); the signature only bounds *how long* the URL
     works, not *who* it works for.
+
+    `download_filename`, when given, signs a Content-Disposition: attachment
+    header into the URL so the browser actually downloads the file instead
+    of navigating to it inline -- pass it for a guest's "download my photo"
+    action, leave it unset for an <img> preview src.
     """
-    return get_client().generate_presigned_url(
-        "get_object",
-        Params={"Bucket": settings.minio_bucket, "Key": key},
-        ExpiresIn=expires_in_seconds,
-    )
+    params: dict[str, str] = {"Bucket": settings.minio_bucket, "Key": key}
+    if download_filename:
+        params["ResponseContentDisposition"] = f'attachment; filename="{download_filename}"'
+    return get_client().generate_presigned_url("get_object", Params=params, ExpiresIn=expires_in_seconds)
 
 
 def delete_objects(keys: list[str]) -> list[str]:

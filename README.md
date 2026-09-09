@@ -11,7 +11,7 @@ Hard constraints that govern every change in this repo: [`CLAUDE.md`](CLAUDE.md)
 
 ## Status
 
-**Phase 1, in progress.** Done and verified end-to-end (including inside the real
+**Phase 1 complete.** Done and verified end-to-end (including inside the real
 arm64 Docker image, not just a host venv):
 
 - Full data model (SQLAlchemy models + initial Alembic migration), against a live
@@ -46,8 +46,29 @@ arm64 Docker image, not just a host venv):
   local folder of photos through the same MD5-dedupe path the ingest API
   uses, in-process (no server needs to be running). Run end-to-end
   including processing the queued photos through the real worker.
+- Backend endpoints the frontend needed but earlier steps hadn't required
+  yet: event lookup by QR token, dashboard event CRUD (against a single
+  implicit dev organization — see "Dashboard API" below), photo listing +
+  moderation, and guest feedback ("not me" / "remove this photo of me").
+- Frontend (`web/`): Next.js 14 App Router + TypeScript + Tailwind,
+  RTL-first, Arabic default with an English toggle. All three routes —
+  `/e/[qr_token]`, `/dashboard/events`, `/dashboard/events/[id]/moderate` —
+  verified for real in a headless-Chromium browser (Playwright), not just
+  built: consent screen with a never-pre-ticked checkbox, the locale
+  toggle actually flipping `dir`/`lang` and every string on screen, the
+  camera-unavailable fallback to a file picker, and a **complete real
+  match run** — uploaded a real selfie through the file-upload fallback,
+  it hit the real backend, ran the real buffalo_l model, found the real
+  photo, rendered the watermarked preview, and both "this isn't me" and
+  "remove this photo of me" (with its confirm dialog) worked end-to-end,
+  the latter correctly removing the photo from the gallery client-side.
+  Zero console errors across every screen tested.
 
-Not built yet: frontend.
+Phase 1 is feature-complete for the core loop this repo set out to build.
+What's left is genuinely Phase 2+ scope: FTPS/live-capture ingest, real
+auth (the dashboard currently has none — see "Dashboard API"), payments,
+code-match mode, and actual purge-scheduling infrastructure beyond the
+interval-loop container already running (see "Scheduling").
 
 ## Repo layout
 
@@ -91,7 +112,20 @@ laqta/
 │   │   ├── purge_scheduler.py       # long-running: enqueues purge on a timer
 │   │   └── seed.py                    # CLI: demo org+event, ingest a folder
 │   └── tests/
-└── web/                      # Next.js app — not scaffolded yet
+└── web/                      # Next.js 14 app -- runs natively on the host
+    ├── app/
+    │   ├── e/[qr_token]/page.tsx           # guest flow
+    │   └── dashboard/events/
+    │       ├── page.tsx                      # list + create
+    │       └── [id]/moderate/page.tsx        # approve/reject queue
+    ├── components/
+    │   ├── guest/                          # ConsentScreen, SelfieCapture,
+    │   │                                   # MatchedGallery, PhotoCard, ...
+    │   ├── dashboard/                      # CreateEventForm, EventCard
+    │   └── LocaleProvider.tsx              # see "i18n" in web/README.md
+    └── lib/
+        ├── api.ts                          # typed fetch wrappers, ApiError
+        └── i18n.ts                         # ar/en dictionaries
 ```
 
 ## Data model
@@ -173,12 +207,25 @@ DATABASE_URL=postgresql+psycopg://laqta:laqta_dev_password@localhost:5432/laqta 
 (Once the `api`/`worker` containers have real code, `docker compose up` runs
 migrations the same way from inside the container — see `docker-compose.yml`.)
 
-Confirm the API skeleton runs:
+Confirm the API runs:
 
 ```bash
 docker compose up -d api
 curl http://localhost:8000/health   # {"status": "ok"}
 ```
+
+Run the frontend (natively on the host, not in Docker — see CLAUDE.md):
+
+```bash
+cd web
+cp .env.local.example .env.local   # NEXT_PUBLIC_API_URL, defaults to http://localhost:8000
+npm install
+npm run dev
+```
+
+Then either scan a QR code from `/dashboard/events` (create one there
+first) or run `scripts/seed.py` (see "Seed script" below) for a
+ready-made demo event to open `/e/<qr_token>` directly.
 
 ## Worker pipeline
 
@@ -490,12 +537,35 @@ TEST_DATABASE_URL=postgresql+psycopg://laqta:laqta_dev_password@localhost:5432/l
 `TEST_DATABASE_URL` defaults to `laqta_test` on `localhost:5432` if unset; Redis/MinIO
 settings come from the same env vars the app uses (see `.env.example`).
 
+## Dashboard API
+
+`GET /api/events/{id}`, `GET`/`POST /api/organizations/{id}/events`,
+`GET /api/dashboard/organization`, `GET /api/events/{id}/photos`
+(`?status=` filter, presigned thumbnail URLs), `POST
+/api/events/{id}/photos/{photo_id}/moderate?action=approve|reject`.
+
+**No auth at all** — this was never part of the numbered backend steps, and
+building it wasn't in scope for making the frontend's three routes real.
+`GET /api/dashboard/organization` get-or-creates a single implicit "Dev
+Organization" and every dashboard call operates against it; there's no
+login, no session, no per-user anything. `scripts/seed.py --org-name`
+defaults to that exact same name on purpose, so seeded demo data shows up
+in the dashboard without extra setup. This is a documented Phase 1
+simplification, not an oversight — real auth is genuinely Phase 2+ scope
+(multi-tenant organizer accounts, photographer accounts scoped to one
+event per §7.2 of `docs/plan.md`, staff roles).
+
+`moderate`'s reject and a guest's "remove this photo of me" both just set
+`photos.published = false` — there's no separate "rejected, don't
+resurface" state in the schema, so a rejected photo will reappear in the
+moderation queue on the next visit rather than staying dismissed. Noted in
+`web/app/dashboard/events/[id]/moderate/page.tsx`; fixing it properly means
+a schema change (a real moderation-status enum, not a boolean) that felt
+like scope creep beyond what was asked.
+
 ## Next up
 
-The frontend: `/e/[qr_token]` (guest consent → selfie → matched gallery),
-`/dashboard/events` (create event, QR, live upload count), and
-`/dashboard/events/[id]/moderate` (approve/reject pending photos — this also
-needs a small moderation API endpoint that doesn't exist yet, since it was
-never one of the numbered backend steps). Wiring up actual purge-job
-scheduling (see "Purge job" above) is worth doing before this goes anywhere
-near production.
+Phase 2, per `docs/plan.md`: FTPS ingest with per-event credentials, a
+desktop watch-folder agent, live gallery updates, real auth for the
+dashboard, code-match mode, and `rq-scheduler`/real cron for the purge job
+if wall-clock-fixed timing ever matters (see "Scheduling" above).

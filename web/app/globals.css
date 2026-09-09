@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Large tap targets everywhere by default -- this app is used one-handed,
+   on a phone, often in a dim wedding hall. Buttons/links get a comfortable
+   minimum hit area unless a component opts out explicitly. */
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+input[type="checkbox"] {
+  accent-color: #0f172a;
+}

@@ -70,7 +70,13 @@ def get_signed_photo_url(
         raise HTTPException(status_code=404, detail={"code": "photo_not_found", "message": "Photo not found."})
 
     key = photo.s3_key_preview if variant == "preview" else photo.s3_key_original
-    url = minio_client.presigned_get_url(key, settings.signed_url_ttl_seconds)
+    # Content-Disposition: attachment only for "original" -- a guest
+    # tapping Download should get a file save, not the browser navigating
+    # to the image; a preview src is meant to render inline in the gallery.
+    download_filename = f"{photo.id}.jpg" if variant == "original" else None
+    url = minio_client.presigned_get_url(
+        key, settings.signed_url_ttl_seconds, download_filename=download_filename
+    )
 
     db.add(
         Download(

@@ -42,7 +42,12 @@ def _original_key(event_id, photo_id) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("folder", type=Path, help="Folder of photos to ingest (non-recursive)")
-    parser.add_argument("--org-name", default="Demo Organizer")
+    # Matches app.api.routes.events._DEFAULT_ORG_NAME on purpose: the
+    # dashboard's get-or-create-default-org endpoint uses that exact name,
+    # so seeded events show up in `/dashboard/events` without extra setup.
+    # A different --org-name here creates a real, separate organization
+    # the dashboard simply won't query.
+    parser.add_argument("--org-name", default="Dev Organization")
     parser.add_argument("--event-name-ar", default="حدث تجريبي")
     parser.add_argument("--event-name-en", default="Demo Event")
     parser.add_argument("--privacy-mode", choices=["standard", "strict"], default="standard")

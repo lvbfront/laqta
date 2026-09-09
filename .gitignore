@@ -12,6 +12,7 @@ venv/
 .env
 .env.*
 !.env.example
+!web/.env.local.example
 
 # Node / Next.js
 web/node_modules/
