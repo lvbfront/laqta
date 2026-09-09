@@ -1,0 +1,35 @@
+# --- Web framework ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic==2.10.5
+pydantic-settings==2.7.1
+
+# --- DB ---
+SQLAlchemy==2.0.36
+alembic==1.14.0
+psycopg[binary]==3.2.3
+pgvector==0.3.6
+
+# --- Queue ---
+redis==5.2.1
+rq==2.1.0
+
+# --- Object storage ---
+boto3==1.35.90
+
+# --- Images / faces (used by the worker pipeline, phase 1 step 3+) ---
+pyvips==2.2.3
+insightface==0.7.3
+onnxruntime==1.20.1
+numpy==1.26.4
+opencv-python-headless==4.10.0.84
+
+# --- Misc ---
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# --- Dev / test ---
+pytest==8.3.4
+pytest-cov==6.0.0
+httpx==0.28.1
