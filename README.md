@@ -65,9 +65,10 @@ arm64 Docker image, not just a host venv):
   Zero console errors across every screen tested.
 
 Phase 1 is feature-complete for the core loop this repo set out to build.
-What's left is genuinely Phase 2+ scope: FTPS/live-capture ingest, real
-auth (the dashboard currently has none — see "Dashboard API"), payments,
-code-match mode, and actual purge-scheduling infrastructure beyond the
+Phase 2 added real dashboard auth, code-match mode, and FTPS ingest with
+per-event credentials (see "Next up" below for how each was verified).
+What's left: payments, a desktop watch-folder agent, live gallery
+updates, and actual purge-scheduling infrastructure beyond the
 interval-loop container already running (see "Scheduling").
 
 ## Repo layout
@@ -147,8 +148,14 @@ laqta/
   simply never matches `NULL`, no error, no warning). See
   `app/models/event.py`'s `_default_retention_until` and
   `tests/test_event_retention_defaults.py`.
-- `photographers` — scoped to an org; `ftp_username`/`ftp_password_hash` are
-  reserved for the Phase 2 FTPS ingest path, unused for now.
+- `photographers` — scoped to an org. FTPS ingest credentials are *not*
+  a column here — see `event_ftp_credentials` below for why.
+- `event_ftp_credentials` — one row per issued FTPS username/password,
+  scoped to a single event (not a photographer, who might shoot several
+  events): `docs/plan.md`'s "per-event username, generated password".
+  Only `password_hash` is ever persisted; `revoked_at` is set (not
+  deleted) so a stopped credential still has an audit trail. See
+  "FTPS ingest" below.
 - `photos` — `status` (`pending`|`processing`|`ready`|`failed`), `published`
   (moderation gate, separate from processing status), MD5-deduped per event
   (`uq_photos_event_md5`).
@@ -332,8 +339,11 @@ upload in the common case) and the DB unique constraint (`try: db.flush()
 except IntegrityError`, which is what actually holds under two near-
 simultaneous uploads of the same file — see `tests/test_ingest_photos.py`).
 
-No auth on this endpoint yet — Phase 2 introduces per-event FTPS/photographer
-credentials; there's nothing to check against yet in Phase 1.
+Requires a session bearer token for an `owner`/`staff`/`photographer` of the
+event's org (`app/api/deps.py`'s `require_event_access` + `require_role`) —
+see "Dashboard auth" below. The FTPS path (see "FTPS ingest") hits the same
+`app/services/ingest.py:ingest_photo` underneath, authenticated instead by
+its own per-event credential.
 
 ## Match API
 
@@ -539,21 +549,28 @@ settings come from the same env vars the app uses (see `.env.example`).
 
 ## Dashboard API
 
-`GET /api/events/{id}`, `GET`/`POST /api/organizations/{id}/events`,
-`GET /api/dashboard/organization`, `GET /api/events/{id}/photos`
-(`?status=` filter, presigned thumbnail URLs), `POST
-/api/events/{id}/photos/{photo_id}/moderate?action=approve|reject`.
+`POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`,
+`GET /api/auth/me`, `GET /api/events/{id}`, `GET`/`POST
+/api/organizations/{id}/events`, `GET /api/events/{id}/photos` (`?status=`
+filter, presigned thumbnail URLs), `POST
+/api/events/{id}/photos/{photo_id}/moderate?action=approve|reject`, `POST
+/api/events/{id}/photos/{photo_id}/codes` /
+`DELETE .../codes/{code}` (match_mode='code' bib/badge tagging), `POST`/`GET`
+`/api/events/{id}/ftp-credentials` / `DELETE .../ftp-credentials/{id}`.
 
-**No auth at all** — this was never part of the numbered backend steps, and
-building it wasn't in scope for making the frontend's three routes real.
-`GET /api/dashboard/organization` get-or-creates a single implicit "Dev
-Organization" and every dashboard call operates against it; there's no
-login, no session, no per-user anything. `scripts/seed.py --org-name`
-defaults to that exact same name on purpose, so seeded demo data shows up
-in the dashboard without extra setup. This is a documented Phase 1
-simplification, not an oversight — real auth is genuinely Phase 2+ scope
-(multi-tenant organizer accounts, photographer accounts scoped to one
-event per §7.2 of `docs/plan.md`, staff roles).
+Every route above except `register`/`login` requires a bearer session token
+(`Authorization: Bearer <token>`, `app/api/deps.py`'s `get_current_user`) and
+is scoped to the event/org that token's user belongs to: a valid session for
+the wrong org gets **404** (anti-enumeration — same "can't tell doesn't-exist
+from isn't-yours" reasoning as the guest-facing delivery API), a valid
+session with the wrong role (e.g. a `moderator` trying to `create_event`)
+gets **403**. Sessions live in `user_sessions` (7-day TTL), separate from
+`Guest.session_token` because staff can have more than one active session at
+once. Passwords are hashed with `bcrypt` directly (see `app/core/security.py`
+— not `passlib`, which is incompatible with `bcrypt>=4.1`). `scripts/seed.py`
+creates a real login (`--email`/`--password`, printed at the end of the run)
+for its seeded org, since there's no more get-or-create-a-default-org
+endpoint for it to lean on.
 
 `moderate`'s reject and a guest's "remove this photo of me" both just set
 `photos.published = false` — there's no separate "rejected, don't
@@ -565,7 +582,18 @@ like scope creep beyond what was asked.
 
 ## Next up
 
-Phase 2, per `docs/plan.md`: FTPS ingest with per-event credentials, a
-desktop watch-folder agent, live gallery updates, real auth for the
-dashboard, code-match mode, and `rq-scheduler`/real cron for the purge job
-if wall-clock-fixed timing ever matters (see "Scheduling" above).
+Phase 2 done: real dashboard auth (register/login/session/role
+enforcement), code-match mode (`match_mode='code'` — a bib/badge code
+instead of a selfie, worker skips face detection entirely for those
+events' photos, verified against the real InsightFace import never firing),
+and FTPS ingest (`pyftpdlib` + `TLS_FTPHandler`, a custom DB-backed
+authorizer over per-event credentials from `event_ftp_credentials`,
+write-only permissions -- no LIST/RETR -- and a self-signed dev cert
+generated on first start). All three verified against real
+Postgres/Redis/MinIO and, for FTPS, a real `ftplib.FTP_TLS` client over an
+actual TLS socket (`tests/test_ftps_ingest.py`), not mocks.
+
+Still open: payments, a desktop watch-folder agent (Tier C in
+`docs/plan.md`, for cameras without built-in FTP), live gallery updates,
+and `rq-scheduler`/real cron for the purge job if wall-clock-fixed timing
+ever matters (see "Scheduling" above).

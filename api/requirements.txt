@@ -26,6 +26,13 @@ onnxruntime==1.20.1
 numpy==1.26.4
 opencv-python-headless==4.10.0.84
 
+# --- FTPS ingest ---
+pyftpdlib==2.0.1
+# pyftpdlib.handlers.TLS_FTPHandler is only defined if this import
+# succeeds -- without it, "from pyftpdlib.handlers import TLS_FTPHandler"
+# (app/ftps/handler.py) raises ImportError at startup, confirmed by hand.
+pyOpenSSL==26.4.0
+
 # --- Misc ---
 python-jose[cryptography]==3.3.0
 # Not passlib[bcrypt]: passlib==1.7.4 (its latest release; the project is

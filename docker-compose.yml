@@ -96,6 +96,36 @@ services:
       minio:
         condition: service_healthy
 
+  ftps:
+    build:
+      context: ./api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://laqta:laqta_dev_password@postgres:5432/laqta}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      FTPS_HOST: 0.0.0.0
+      FTPS_PORT: ${FTPS_PORT:-2121}
+      FTPS_PASSIVE_PORT_START: ${FTPS_PASSIVE_PORT_START:-30000}
+      FTPS_PASSIVE_PORT_END: ${FTPS_PASSIVE_PORT_END:-30009}
+      # Passive-mode data connections need the address a camera/agent can
+      # actually reach -- unset (empty) is right for local dev (no NAT
+      # hop between the client and this container); a real deployment
+      # behind NAT/a cloud LB sets this to that public address.
+      FTPS_MASQUERADE_ADDRESS: ${FTPS_MASQUERADE_ADDRESS:-}
+    command: python -m app.ftps.server
+    volumes:
+      - ./api:/app
+      - ftps_certs:/tmp/laqta-ftps
+    ports:
+      - "${FTPS_PORT:-2121}:2121"
+      - "${FTPS_PASSIVE_PORT_START:-30000}-${FTPS_PASSIVE_PORT_END:-30009}:30000-30009"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   purge-scheduler:
     build:
       context: ./api
@@ -126,3 +156,4 @@ volumes:
   redisdata:
   miniodata:
   insightface_models:
+  ftps_certs:

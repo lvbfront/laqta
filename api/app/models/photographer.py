@@ -17,11 +17,7 @@ if TYPE_CHECKING:
 
 
 class Photographer(Base, UUIDPKMixin, TimestampMixin):
-    """A photographer profile within an org — shoots photos across that org's events.
-
-    ftp_username/ftp_password_hash are reserved for Phase 2 (FTPS ingest);
-    unused by the Phase 1 REST upload path.
-    """
+    """A photographer profile within an org — shoots photos across that org's events."""
 
     __tablename__ = "photographers"
 
@@ -32,8 +28,6 @@ class Photographer(Base, UUIDPKMixin, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, unique=True
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    ftp_username: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
-    ftp_password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     organization: Mapped["Organization"] = relationship(back_populates="photographers")
     user: Mapped["User | None"] = relationship(back_populates="photographer_profile")

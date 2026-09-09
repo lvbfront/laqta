@@ -5,15 +5,19 @@ import { useRef, useState } from "react";
 import { useLocale } from "@/components/LocaleProvider";
 import { QrCode } from "@/components/QrCode";
 import * as api from "@/lib/api";
-import type { EventDetail } from "@/lib/api";
+import type { EventDetail, FtpCredentialIssued } from "@/lib/api";
 
 const SITE_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
+const FTP_HOST = typeof window !== "undefined" ? window.location.hostname : "";
+const FTP_PORT = process.env.NEXT_PUBLIC_FTPS_PORT || "2121";
 
 export function EventCard({ event }: { event: EventDetail }) {
   const { t, locale } = useLocale();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [ftpCredential, setFtpCredential] = useState<FtpCredentialIssued | null>(null);
+  const [issuingFtp, setIssuingFtp] = useState(false);
 
   const name = locale === "ar" ? event.name_ar : event.name_en;
   const guestUrl = `${SITE_ORIGIN}/e/${event.qr_token}`;
@@ -27,6 +31,16 @@ export function EventCard({ event }: { event: EventDetail }) {
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleIssueFtpCredential() {
+    setIssuingFtp(true);
+    try {
+      const credential = await api.issueFtpCredential(event.id);
+      setFtpCredential(credential);
+    } finally {
+      setIssuingFtp(false);
     }
   }
 
@@ -87,7 +101,39 @@ export function EventCard({ event }: { event: EventDetail }) {
           >
             {t("dashboard.events.moderate_link")}
           </Link>
+
+          <button
+            type="button"
+            onClick={handleIssueFtpCredential}
+            disabled={issuingFtp}
+            className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 disabled:opacity-60"
+          >
+            {issuingFtp ? t("dashboard.events.ftp_generating") : t("dashboard.events.ftp_credentials")}
+          </button>
         </div>
+
+        {ftpCredential && (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+            <p className="font-medium text-amber-800 mb-2">{t("dashboard.events.ftp_shown_once")}</p>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-neutral-700" dir="ltr">
+              <dt className="text-neutral-500">{t("dashboard.events.ftp_host")}</dt>
+              <dd className="font-mono">{FTP_HOST}</dd>
+              <dt className="text-neutral-500">{t("dashboard.events.ftp_port")}</dt>
+              <dd className="font-mono">{FTP_PORT}</dd>
+              <dt className="text-neutral-500">{t("dashboard.events.ftp_username")}</dt>
+              <dd className="font-mono">{ftpCredential.username}</dd>
+              <dt className="text-neutral-500">{t("dashboard.events.ftp_password")}</dt>
+              <dd className="font-mono">{ftpCredential.password}</dd>
+            </dl>
+            <button
+              type="button"
+              onClick={() => setFtpCredential(null)}
+              className="mt-3 text-xs font-medium text-amber-800 underline"
+            >
+              {t("dashboard.events.ftp_close")}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

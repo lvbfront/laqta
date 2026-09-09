@@ -90,6 +90,15 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     "dashboard.events.match_mode_both": "كلاهما",
     "dashboard.events.logout": "تسجيل الخروج",
 
+    "dashboard.events.ftp_credentials": "بيانات FTP",
+    "dashboard.events.ftp_generating": "جارٍ الإنشاء...",
+    "dashboard.events.ftp_host": "الخادم",
+    "dashboard.events.ftp_port": "المنفذ",
+    "dashboard.events.ftp_username": "اسم المستخدم",
+    "dashboard.events.ftp_password": "كلمة المرور",
+    "dashboard.events.ftp_shown_once": "احفظ كلمة المرور الآن — لن تظهر مرة أخرى.",
+    "dashboard.events.ftp_close": "إغلاق",
+
     "dashboard.moderate.codes_label": "رموز الشارة/السوار",
     "dashboard.moderate.codes_placeholder": "أدخل رمزًا",
     "dashboard.moderate.codes_add": "إضافة",
@@ -189,6 +198,15 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     "dashboard.events.match_mode_code": "Code (wristband/badge, no biometric data)",
     "dashboard.events.match_mode_both": "Both",
     "dashboard.events.logout": "Log out",
+
+    "dashboard.events.ftp_credentials": "FTP credentials",
+    "dashboard.events.ftp_generating": "Generating...",
+    "dashboard.events.ftp_host": "Host",
+    "dashboard.events.ftp_port": "Port",
+    "dashboard.events.ftp_username": "Username",
+    "dashboard.events.ftp_password": "Password",
+    "dashboard.events.ftp_shown_once": "Save this password now -- it won't be shown again.",
+    "dashboard.events.ftp_close": "Close",
 
     "dashboard.moderate.codes_label": "Bib/badge codes",
     "dashboard.moderate.codes_placeholder": "Enter a code",

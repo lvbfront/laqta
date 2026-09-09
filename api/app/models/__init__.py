@@ -5,6 +5,7 @@ required for Alembic autogenerate and for create_all() in tests.
 from app.models.audit_log import AuditLog
 from app.models.download import Download
 from app.models.event import Event
+from app.models.event_ftp_credential import EventFtpCredential
 from app.models.face import Face
 from app.models.guest import Guest
 from app.models.guest_face import GuestFace
@@ -20,6 +21,7 @@ __all__ = [
     "AuditLog",
     "Download",
     "Event",
+    "EventFtpCredential",
     "Face",
     "Guest",
     "GuestFace",

@@ -23,11 +23,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from app.core.security import hash_password  # noqa: E402
 from app.db import SessionLocal  # noqa: E402
-from app.models.enums import AccountType, EventStatus, MatchMode, PhotoStatus, PrivacyMode  # noqa: E402
+from app.models.enums import AccountType, EventStatus, MatchMode, PhotoStatus, PrivacyMode, UserRole  # noqa: E402
 from app.models.event import Event  # noqa: E402
 from app.models.organization import Organization  # noqa: E402
 from app.models.photo import Photo  # noqa: E402
+from app.models.user import User  # noqa: E402
 from app.storage import minio_client  # noqa: E402
 from app.workers.jobs import process_photo  # noqa: E402
 from app.workers.queue import get_photo_processing_queue  # noqa: E402
@@ -42,15 +44,24 @@ def _original_key(event_id, photo_id) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("folder", type=Path, help="Folder of photos to ingest (non-recursive)")
-    # Matches app.api.routes.events._DEFAULT_ORG_NAME on purpose: the
-    # dashboard's get-or-create-default-org endpoint uses that exact name,
-    # so seeded events show up in `/dashboard/events` without extra setup.
-    # A different --org-name here creates a real, separate organization
-    # the dashboard simply won't query.
     parser.add_argument("--org-name", default="Dev Organization")
     parser.add_argument("--event-name-ar", default="حدث تجريبي")
     parser.add_argument("--event-name-en", default="Demo Event")
     parser.add_argument("--privacy-mode", choices=["standard", "strict"], default="standard")
+    # Real auth (Phase 2) means the dashboard has no more "get-or-create a
+    # default org and let anyone in" endpoint -- something has to be able
+    # to log in and see this seeded event, so seed.py creates a real
+    # owner user for the org too. --email lets a second `seed.py` run
+    # against an *existing* dev account add another demo event to it
+    # instead of erroring on a duplicate-email conflict.
+    # Not dev@laqta.local -- pydantic's EmailStr (via the email-validator
+    # package, used by /api/auth/login and /api/auth/register) rejects
+    # .local as a reserved/special-use TLD, confirmed by hand: that
+    # address is written straight to the DB here (seed.py doesn't go
+    # through those endpoints) but then can't actually log in through the
+    # real API, which defeats the point of printing it as a login.
+    parser.add_argument("--email", default="dev@example.com")
+    parser.add_argument("--password", default="dev-password-123")
     args = parser.parse_args()
 
     if not args.folder.is_dir():
@@ -66,9 +77,27 @@ def main() -> None:
 
     db = SessionLocal()
     try:
-        org = Organization(name=args.org_name, account_type=AccountType.organizer)
-        db.add(org)
-        db.flush()
+        existing_user = db.query(User).filter(User.email == args.email).first()
+        if existing_user is not None:
+            # Re-running seed.py with the same --email adds another demo
+            # event to that user's existing org, rather than erroring on
+            # users.email's unique constraint or creating an orphaned
+            # second org nothing can log into.
+            org = existing_user.organization
+            print(f"Reusing existing user {args.email} / organization {org.id} ({org.name})")
+            login_note = f"Dashboard login: {args.email} / <the password set when this account was created>"
+        else:
+            org = Organization(name=args.org_name, account_type=AccountType.organizer)
+            db.add(org)
+            db.flush()
+
+            user = User(
+                org_id=org.id, email=args.email, password_hash=hash_password(args.password), role=UserRole.owner
+            )
+            db.add(user)
+            db.flush()
+            print(f"Created organization {org.id} ({org.name})")
+            login_note = f"Dashboard login: {args.email} / {args.password}"
 
         privacy_mode = PrivacyMode(args.privacy_mode)
         event = Event(
@@ -92,12 +121,12 @@ def main() -> None:
         db.flush()
         db.commit()
 
-        print(f"Created organization {org.id} ({org.name})")
         print(
             f"Created event {event.id} ({event.name_en}) -- "
             f"qr_token={event.qr_token}, privacy_mode={event.privacy_mode.value}"
         )
-        print(f"Guest URL (once the frontend exists): /e/{event.qr_token}")
+        print(f"Guest URL: /e/{event.qr_token}")
+        print(login_note)
         print(f"Match API: POST /api/events/{event.id}/match\n")
 
         queue = get_photo_processing_queue()

@@ -251,3 +251,21 @@ export function removePhotoCode(
     headers: authHeaders(),
   });
 }
+
+// ---------------------------------------------------------------------------
+// FTPS ingest credentials (see api/app/api/routes/ftp_credentials.py)
+// ---------------------------------------------------------------------------
+
+export interface FtpCredentialIssued {
+  id: string;
+  username: string;
+  password: string; // plaintext -- shown exactly once, this response only
+  created_at: string;
+}
+
+export function issueFtpCredential(eventId: string): Promise<FtpCredentialIssued> {
+  return getJson(`/api/events/${eventId}/ftp-credentials`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+}
