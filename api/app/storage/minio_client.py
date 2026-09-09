@@ -44,6 +44,20 @@ def download_bytes(key: str) -> bytes:
     return response["Body"].read()
 
 
+def presigned_get_url(key: str, expires_in_seconds: int) -> str:
+    """Short-TTL signed URL for direct guest download from MinIO/S3 -- the
+    API never proxies the bytes itself. Access control happens before this
+    is ever called (app.api.routes.delivery checks the guest has an actual
+    Match to the photo); the signature only bounds *how long* the URL
+    works, not *who* it works for.
+    """
+    return get_client().generate_presigned_url(
+        "get_object",
+        Params={"Bucket": settings.minio_bucket, "Key": key},
+        ExpiresIn=expires_in_seconds,
+    )
+
+
 def derived_key(original_key: str, name: str) -> str:
     """Derive a sibling object key from an original's key, e.g.
     'events/<event_id>/photos/<photo_id>/original.jpg' ->

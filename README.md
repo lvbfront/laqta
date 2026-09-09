@@ -24,8 +24,18 @@ arm64 Docker image, not just a host venv):
   against a real ingested photo and confirming the full chain: raw upload →
   `status='ready'`, 6/6 faces detected, thumbnail/preview written, original
   overwritten with an EXIF-free re-encode.
+- Match API: `POST /api/events/{event_id}/match` — selfie validated in memory
+  before any search, matched against real event photos with a real selfie
+  image end-to-end. Found and fixed a real bug along the way: Starlette's
+  multipart parser spools uploads over 1MB to a real temp file on disk by
+  default, smaller than a typical selfie — see "Match API" below for the
+  details and the regression test that reproduces it.
+- Delivery API: `GET /api/guest/photos/{photo_id}/url` — short-TTL presigned
+  MinIO URLs, scoped to a guest session token and gated on an actual `Match`
+  row (which also naturally means "matched below threshold" and "never
+  matched" are the same, correctly-denied state).
 
-Not built yet: match API, delivery API, purge job, frontend, seed script.
+Not built yet: purge job, frontend, seed script.
 
 ## Repo layout
 
@@ -46,8 +56,11 @@ laqta/
 │   │   ├── db.py                  # SQLAlchemy engine/session/Base
 │   │   ├── models/                  # one file per table (see below)
 │   │   ├── api/routes/
-│   │   │   └── photos.py                # ingest: POST /api/events/{id}/photos
-│   │   │                                # (match/delivery/moderation land here next)
+│   │   │   ├── photos.py                # ingest: POST /api/events/{id}/photos
+│   │   │   ├── match.py                   # POST /api/events/{id}/match
+│   │   │   └── delivery.py                  # GET /api/guest/photos/{id}/url
+│   │   │                                # (moderation lands here next)
+│   │   ├── api/utils.py                  # client_ip() -- shared by match/delivery
 │   │   ├── workers/
 │   │   │   ├── pipeline.py              # pure: bytes in, derivatives+faces out
 │   │   │   ├── jobs.py                    # RQ job: DB + MinIO orchestration
@@ -250,11 +263,94 @@ simultaneous uploads of the same file — see `tests/test_ingest_photos.py`).
 No auth on this endpoint yet — Phase 2 introduces per-event FTPS/photographer
 credentials; there's nothing to check against yet in Phase 1.
 
+## Match API
+
+`POST /api/events/{event_id}/match` — multipart, `selfie` (image) + `consent`
+(bool, must be `true`). The selfie is **never written to disk, MinIO, a temp
+file, or a log line** — decoded in memory, embedded, discarded when the
+request returns. See `tests/test_selfie_never_persisted.py`, and the note
+below about a real bug that testing this surfaced.
+
+Validation runs, in this order, entirely before any search against the
+event's faces — a selfie that fails is never compared against anything:
+
+| Order | Check | Error `code` |
+|---|---|---|
+| 1 | Exactly one face detected | `no_face_detected` / `multiple_faces_detected` |
+| 2 | Detection score ≥ `MIN_DET_SCORE` | `low_detection_confidence` |
+| 3 | Face bbox ≥ `MIN_FACE_BBOX_PX` on its shorter side | `face_too_small` |
+| 4 | Variance of the Laplacian of the face crop ≥ `MIN_BLUR_VARIANCE` | `selfie_too_blurry` |
+
+Each is a distinct code with an actionable message (move closer, better
+light, remove sunglasses/mask, hold the camera steady, take the photo
+alone) — not a generic "try again". `tests/test_selfie_validation.py` pins
+the order and every branch using a mocked detector (fast, deterministic,
+no model needed); `tests/test_match_api.py` covers the real end-to-end path
+with the actual model.
+
+On success: embeds the selfie, `app.services.face_search.search_faces`
+(cosine similarity, scoped to the event, HNSW + `iterative_scan` — see
+"Data model" above), groups by photo taking the max score, keeps only
+**published** photos (a plain post-filter on the result set, deliberately
+*not* folded into the search query itself — doing that would reintroduce
+the filtered-ANN recall issue `faces.event_id` was denormalized to avoid),
+creates `guests` + `guest_faces` rows (`expires_at` = now + `GUEST_FACE_RETENTION_DAYS`),
+persists one `matches` row per surfaced photo, and returns
+`{guest_session_token, matches: [{photo_id, score}, ...]}` sorted descending.
+
+The full per-query score distribution is logged at `DEBUG` (not just what
+crossed threshold) — `MATCH_THRESHOLD` tuning is a matter of running real
+selfies against a real event and reading these:
+
+```
+match scores event=<uuid> guest=<uuid> threshold=0.380 n=14 scores=[0.71, 0.68, 0.55, 0.4, 0.31, ...]
+```
+
+**A real bug, found by building the "never touches disk" test properly:**
+Starlette's multipart parser spools each uploaded part in memory only up to
+`MultiPartParser.max_file_size` (default 1MB) before spilling to a real
+`SpooledTemporaryFile`-backed temp file — confirmed empirically that a 2MB
+upload triggers a real disk write under that default. A phone selfie
+routinely exceeds 1MB, so the *selfie itself* would have silently violated
+CLAUDE.md's constraint regardless of anything our own route code does.
+Fixed in `app/main.py` by raising that threshold well above any realistic
+upload; `tests/test_selfie_never_persisted.py` uses a genuinely ~1.3MB
+fixture image specifically so it would have caught this, and does (verified
+by reverting the fix locally and watching the test fail on the disk-spill
+assertion before restoring it).
+
+## Delivery API
+
+`GET /api/guest/photos/{photo_id}/url?variant=preview|original` — header
+`Authorization: Bearer <guest_session_token>`. Returns a short-TTL
+(`SIGNED_URL_TTL_SECONDS`) presigned MinIO URL; the API never proxies the
+image bytes itself.
+
+Every request is scoped down to one question: does a `Match` row connect
+this guest to this photo? Nothing else about the photo or the guest's event
+membership is checked separately, because that one condition already
+implies it — a guest's matches only ever come from their own event's faces.
+That same single check is *why* a photo from a different event and a
+photo that scored below `MATCH_THRESHOLD` land on exactly the same 404:
+neither ever produced a `Match` row (the match endpoint only persists rows
+for photos that clear threshold), so "wrong event" and "below threshold"
+are indistinguishable, correctly-denied states, not two code paths that
+could drift out of sync. `published` is re-checked here too, not just
+trusted from match time — a future moderation action could unpublish a
+photo after it was matched, and that has to revoke delivery immediately.
+See `tests/test_delivery_scoping.py` for both cases plus missing/invalid
+session tokens.
+
+Every issued URL is logged to `downloads` (guest_id, photo_id, ip, at) —
+logged at issuance, not at the actual MinIO GET, since presigned-URL
+downloads happen directly against MinIO and aren't otherwise observable
+from the API process.
+
 ## Environment variables
 
 See [`.env.example`](.env.example) for the full, current list (Postgres/Redis/MinIO
 connection settings, `MATCH_THRESHOLD`, `GUEST_FACE_RETENTION_DAYS`, face-pipeline
-tuning). This section will be expanded as the match/delivery APIs land.
+tuning, blur/upload-size limits, `SIGNED_URL_TTL_SECONDS`).
 
 ## Running tests
 
@@ -280,6 +376,6 @@ settings come from the same env vars the app uses (see `.env.example`).
 
 ## Next up
 
-Match API (`POST /api/events/{event_id}/match`): selfie quality gate, embed,
-`app.services.face_search.search_faces`, group by photo, create `guests` +
-`guest_faces`. Then delivery API, purge job, frontend, seed script.
+Purge job (scheduled RQ job: hard-delete expired `guest_faces` and
+past-retention event data, writing to `audit_log`). Then the frontend and
+seed script.

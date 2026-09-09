@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     minio_secret_key: str = "laqta_dev_password"
     minio_bucket: str = "laqta-photos"
     minio_secure: bool = False
+    signed_url_ttl_seconds: int = 300
 
     # --- Matching / face pipeline ---
     match_threshold: float = 0.38
@@ -32,6 +33,21 @@ class Settings(BaseSettings):
     onnxruntime_provider: str = "CPUExecutionProvider"
     min_face_bbox_px: int = 40
     min_det_score: float = 0.5
+    # Variance of the Laplacian of the detected face crop; below this, the
+    # selfie is rejected as too blurry to embed reliably. 100 is a common
+    # starting heuristic for this metric -- expect to retune against real
+    # selfies (see MATCH_THRESHOLD tuning notes in the README).
+    min_blur_variance: float = 100.0
+    # Multipart parts above this are rejected outright (413) -- a real
+    # selfie is never this large, and it bounds max_upload_spool_bytes below.
+    max_selfie_upload_bytes: int = 8 * 1024 * 1024
+    # Starlette's multipart parser spools each part in memory only up to
+    # this size before spilling to a real temp file on disk. Its default
+    # (1MB) is smaller than a typical phone selfie/event photo, which would
+    # silently violate "the selfie never touches disk" for any normal
+    # upload. Must stay above max_selfie_upload_bytes (see app/main.py,
+    # where this is applied) and above a realistic event-photo size.
+    max_upload_spool_bytes: int = 20 * 1024 * 1024
 
 
 @lru_cache

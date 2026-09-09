@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import cv2
 import numpy as np
 import pyvips
 
@@ -111,3 +112,17 @@ def make_watermarked_preview_jpeg(image: pyvips.Image, width: int = PREVIEW_WIDT
 
     flattened = result.flatten(background=[255, 255, 255])
     return flattened.write_to_buffer(".jpg", Q=JPEG_QUALITY, strip=True)
+
+
+def laplacian_variance(bgr: np.ndarray) -> float:
+    """Variance of the Laplacian -- a standard focus-blur heuristic: a
+    sharp image has a lot of high-frequency edge content (high variance),
+    a blurry one doesn't. Used on the selfie's face crop specifically
+    (app.api.routes.match), not the whole frame, since a sharp face against
+    a blurry background is fine and a blurry face against a sharp
+    background is exactly the case we need to catch.
+    """
+    if bgr.size == 0:
+        return 0.0
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    return float(cv2.Laplacian(gray, cv2.CV_64F).var())

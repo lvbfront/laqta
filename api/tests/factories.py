@@ -43,9 +43,15 @@ def make_event(db: Session, org: Organization | None = None, **kwargs) -> Event:
 
 
 def make_photo(db: Session, event: Event, **kwargs) -> Photo:
+    original_key = kwargs.get("s3_key_original", f"events/{event.id}/photos/{uuid.uuid4()}/original.jpg")
     photo = Photo(
         event_id=event.id,
-        s3_key_original=kwargs.get("s3_key_original", f"{uuid.uuid4()}.jpg"),
+        s3_key_original=original_key,
+        # Realistic post-worker shape by default -- a photo that's ready
+        # enough to be published/matched always has these set together
+        # (see app/workers/jobs.py).
+        s3_key_thumbnail=kwargs.get("s3_key_thumbnail", original_key.replace("original.jpg", "thumbnail.jpg")),
+        s3_key_preview=kwargs.get("s3_key_preview", original_key.replace("original.jpg", "preview.jpg")),
         md5=kwargs.get("md5", uuid.uuid4().hex),
         status=kwargs.get("status", PhotoStatus.ready),
         published=kwargs.get("published", True),
