@@ -34,8 +34,20 @@ arm64 Docker image, not just a host venv):
   MinIO URLs, scoped to a guest session token and gated on an actual `Match`
   row (which also naturally means "matched below threshold" and "never
   matched" are the same, correctly-denied state).
+- Purge job (`app.workers.purge.run_purge`, `scripts/purge.py --dry-run`):
+  hard-deletes expired `guest_faces` vectors and, for events past
+  `retention_until`, that event's photos/faces/guests/matches/downloads
+  *and* the corresponding MinIO objects — deletes MinIO first, DB rows
+  second, specifically so a partial failure can never leave an orphaned
+  object in storage with no DB row left pointing at it. Verified for real:
+  uploaded genuine objects to MinIO, ran the purge, confirmed they're
+  actually gone (not just that the DB rows are).
+- Seed script (`scripts/seed.py`): creates a demo org + event and ingests a
+  local folder of photos through the same MD5-dedupe path the ingest API
+  uses, in-process (no server needs to be running). Run end-to-end
+  including processing the queued photos through the real worker.
 
-Not built yet: purge job, frontend, seed script.
+Not built yet: frontend.
 
 ## Repo layout
 
@@ -51,7 +63,7 @@ laqta/
 │   │   ├── env.py
 │   │   └── versions/        # 1 migration so far: initial schema
 │   ├── app/
-│   │   ├── main.py             # FastAPI app (health check only, so far)
+│   │   ├── main.py             # FastAPI app, startup config (see below)
 │   │   ├── config.py            # Settings, from env vars
 │   │   ├── db.py                  # SQLAlchemy engine/session/Base
 │   │   ├── models/                  # one file per table (see below)
@@ -63,7 +75,8 @@ laqta/
 │   │   ├── api/utils.py                  # client_ip() -- shared by match/delivery
 │   │   ├── workers/
 │   │   │   ├── pipeline.py              # pure: bytes in, derivatives+faces out
-│   │   │   ├── jobs.py                    # RQ job: DB + MinIO orchestration
+│   │   │   ├── jobs.py                    # RQ jobs: process_photo, purge_expired_data
+│   │   │   ├── purge.py                     # run_purge() -- the actual purge logic
 │   │   │   └── queue.py                     # RQ queue/connection setup
 │   │   ├── services/
 │   │   │   ├── image_ops.py             # pyvips: thumbnail/watermark/EXIF
@@ -73,7 +86,9 @@ laqta/
 │   │   │   └── minio_client.py          # boto3 S3-compatible client
 │   │   └── core/
 │   ├── scripts/
-│   │   └── embed_folder.py      # CLI: detect+embed a folder, dump JSON
+│   │   ├── embed_folder.py      # CLI: detect+embed a folder, dump JSON
+│   │   ├── purge.py               # CLI: run_purge(), --dry-run supported
+│   │   └── seed.py                  # CLI: demo org+event, ingest a folder
 │   └── tests/
 └── web/                      # Next.js app — not scaffolded yet
 ```
@@ -346,6 +361,75 @@ logged at issuance, not at the actual MinIO GET, since presigned-URL
 downloads happen directly against MinIO and aren't otherwise observable
 from the API process.
 
+## Purge job
+
+```bash
+cd api
+source .venv/bin/activate
+python scripts/purge.py --dry-run   # report only, deletes nothing
+python scripts/purge.py             # actually deletes
+```
+
+`app.workers.purge.run_purge()` (RQ job `app.workers.jobs.purge_expired_data`,
+on the `purge` queue already wired up in `docker-compose.yml`'s worker
+command — see "Not wired up yet" below):
+
+1. **`guest_faces`**: hard `DELETE` every row where `expires_at < now()`.
+   Never a soft-delete flag — a purged row leaves no recoverable vector,
+   full stop.
+2. **Events past `retention_until`**: for each, deletes MinIO objects
+   *before* the DB rows that reference them (`photos`, which cascades to
+   `faces`; `guests`, which cascades to `guest_faces`/`matches`/`downloads`)
+   — on purpose, in that order. If a MinIO object fails to delete, the DB
+   rows for that event are left alone this run rather than deleted anyway:
+   an orphaned object in storage with *no DB row left pointing at it* is
+   unrecoverable and undetectable by any future query, which is worse than
+   just retrying the whole event next run (safe, since S3/MinIO delete is
+   idempotent). The **`events` row itself is kept** — it's organizational
+   metadata (name, dates), not personal/biometric data, and an organizer
+   dashboard can still show "this event's data was purged on schedule"
+   against it.
+3. **Audit trail**: one `audit_log` row per category actually deleted
+   (with counts), inserted in the same transaction the deletes commit in.
+   `audit_log` has no FK to what it describes (see `app/models/audit_log.py`)
+   specifically so the entry remains valid evidence after the row it
+   refers to is gone.
+4. **Concurrency**: takes a Postgres session-level advisory lock
+   (`pg_try_advisory_lock`, non-blocking) before doing anything. A second
+   concurrent run — manual + scheduled overlapping, more than one worker —
+   sees the lock held, logs it, and exits immediately rather than piling up
+   waiting or racing the first run on the same rows.
+5. **Idempotent**: an event with nothing left to delete (already purged, or
+   never had data) is silently skipped — no audit_log noise, no error, safe
+   to run as often as you like. `tests/test_purge.py` covers all of this,
+   including seeding both expired and live data and asserting the live data
+   is untouched, and a real (non-mocked) end-to-end run that uploads actual
+   objects to MinIO and confirms they're actually gone afterward, not just
+   that the DB rows are.
+
+**Not wired up yet**: actual periodic *scheduling*. `purge_expired_data` is
+enqueueable and the `purge` RQ queue exists, but nothing currently calls
+`queue.enqueue(purge_expired_data)` on a timer — that needs `rq-scheduler`,
+a host crontab calling `scripts/purge.py`, or whatever the eventual
+deployment platform's scheduled-job feature is. This is infrastructure, not
+logic, and is a reasonable next step before relying on this in production.
+
+## Seed script
+
+```bash
+cd api
+source .venv/bin/activate
+docker compose up -d postgres redis minio   # if not already running
+python scripts/seed.py /path/to/photos
+docker compose up worker                     # to actually process what got queued
+```
+
+Creates a demo `organizations` + `events` row directly (there's no events
+API yet) and ingests every image in the given folder — same MD5-dedupe
+logic as the real ingest endpoint, just called in-process instead of over
+HTTP, so it works without a running API server. Prints the event id, QR
+token, and the `match` endpoint URL to hit once photos are processed.
+
 ## Environment variables
 
 See [`.env.example`](.env.example) for the full, current list (Postgres/Redis/MinIO
@@ -376,6 +460,10 @@ settings come from the same env vars the app uses (see `.env.example`).
 
 ## Next up
 
-Purge job (scheduled RQ job: hard-delete expired `guest_faces` and
-past-retention event data, writing to `audit_log`). Then the frontend and
-seed script.
+The frontend: `/e/[qr_token]` (guest consent → selfie → matched gallery),
+`/dashboard/events` (create event, QR, live upload count), and
+`/dashboard/events/[id]/moderate` (approve/reject pending photos — this also
+needs a small moderation API endpoint that doesn't exist yet, since it was
+never one of the numbered backend steps). Wiring up actual purge-job
+scheduling (see "Purge job" above) is worth doing before this goes anywhere
+near production.

@@ -9,6 +9,7 @@ from app.models.face import Face
 from app.models.photo import Photo
 from app.storage import minio_client
 from app.workers.pipeline import process_photo_bytes
+from app.workers.purge import run_purge
 
 logger = logging.getLogger(__name__)
 
@@ -91,3 +92,22 @@ def process_photo(photo_id: str) -> None:
             raise
     finally:
         db.close()
+
+
+def purge_expired_data() -> None:
+    """RQ job for the 'purge' queue (see docker-compose.yml's worker
+    command). Actually *scheduling* this periodically -- cron, rq-scheduler,
+    a platform's own scheduled-job feature -- is a deployment concern not
+    wired up yet; this is the job body to point that at. See
+    scripts/purge.py for a manual/cron-friendly CLI with --dry-run.
+    """
+    report = run_purge(dry_run=False)
+    if not report.ran:
+        logger.warning("purge_expired_data: skipped -- another purge run holds the advisory lock")
+        return
+    logger.info(
+        "purge_expired_data: deleted %d expired guest_faces row(s); purged data for %d event(s): %s",
+        report.guest_faces_deleted,
+        len(report.events),
+        [str(r.event_id) for r in report.events],
+    )

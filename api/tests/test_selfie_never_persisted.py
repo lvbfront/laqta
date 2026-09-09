@@ -65,7 +65,18 @@ def test_selfie_bytes_never_touch_disk_minio_or_logs(client, db_session, caplog)
         patch("app.storage.minio_client.upload_bytes") as mock_upload,
         patch("app.storage.minio_client.download_bytes") as mock_download,
         patch("app.storage.minio_client.get_client") as mock_get_client,
-        caplog.at_level(logging.DEBUG),
+        # Scoped to our own app logger, not the root logger: pyvips logs
+        # every operation at DEBUG level, *including the raw image buffer
+        # bytes themselves* -- capturing at root level floods this with
+        # multiple megabytes of pyvips internals and, worse, was observed
+        # to trigger an unrelated SpooledTemporaryFile.rollover elsewhere
+        # in the process (most likely pytest's own log-capture buffering
+        # under that volume), producing a false positive on the exact
+        # assertion below. app/main.py separately pins pyvips's logger
+        # above WARNING unconditionally for the same underlying reason;
+        # this scoping is what makes the log-content check below a
+        # meaningful test of *our* code rather than noise from pyvips's.
+        caplog.at_level(logging.DEBUG, logger="app"),
     ):
         resp = client.post(
             f"/api/events/{event.id}/match",

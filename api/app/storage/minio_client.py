@@ -58,6 +58,28 @@ def presigned_get_url(key: str, expires_in_seconds: int) -> str:
     )
 
 
+def delete_objects(keys: list[str]) -> list[str]:
+    """Best-effort batch delete. Returns the keys that failed (empty if
+    everything succeeded) -- callers that must not lose track of an
+    object (see app/workers/purge.py) should treat a non-empty result as
+    "don't delete the DB row that pointed at this yet". S3/MinIO delete is
+    idempotent: re-deleting an already-gone key is not an error, so
+    retrying a partial failure with the same key list is always safe.
+    """
+    if not keys:
+        return []
+    client = get_client()
+    failed: list[str] = []
+    for i in range(0, len(keys), 1000):  # DeleteObjects caps at 1000 keys/request
+        batch = keys[i : i + 1000]
+        response = client.delete_objects(
+            Bucket=settings.minio_bucket,
+            Delete={"Objects": [{"Key": k} for k in batch], "Quiet": True},
+        )
+        failed.extend(err["Key"] for err in response.get("Errors", []))
+    return failed
+
+
 def derived_key(original_key: str, name: str) -> str:
     """Derive a sibling object key from an original's key, e.g.
     'events/<event_id>/photos/<photo_id>/original.jpg' ->
