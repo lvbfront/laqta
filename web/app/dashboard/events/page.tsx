@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { CenteredMessage } from "@/components/CenteredMessage";
 import { useLocale } from "@/components/LocaleProvider";
@@ -8,10 +9,12 @@ import { CreateEventForm } from "@/components/dashboard/CreateEventForm";
 import { EventCard } from "@/components/dashboard/EventCard";
 import * as api from "@/lib/api";
 import type { EventDetail } from "@/lib/api";
+import { clearToken, getToken } from "@/lib/auth";
 
 const POLL_INTERVAL_MS = 5000;
 
 export default function DashboardEventsPage() {
+  const router = useRouter();
   const { t } = useLocale();
   const [orgId, setOrgId] = useState<string | null>(null);
   const [events, setEvents] = useState<EventDetail[] | null>(null);
@@ -29,15 +32,26 @@ export default function DashboardEventsPage() {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (!getToken()) {
+      router.replace("/login");
+      return;
+    }
+
     api
-      .getDefaultOrganization()
-      .then((org) => {
+      .me()
+      .then((user) => {
         if (cancelled) return;
-        setOrgId(org.id);
-        return refresh(org.id);
+        setOrgId(user.org_id);
+        return refresh(user.org_id);
       })
       .catch((err) => {
         if (cancelled) return;
+        if (err instanceof api.ApiError && err.status === 401) {
+          clearToken();
+          router.replace("/login");
+          return;
+        }
         setError(err instanceof api.ApiError ? err.message : t("error.generic"));
       });
     return () => {
@@ -61,6 +75,15 @@ export default function DashboardEventsPage() {
     setEvents((prev) => (prev ? [event, ...prev] : [event]));
   }
 
+  async function handleLogout() {
+    try {
+      await api.logout();
+    } finally {
+      clearToken();
+      router.replace("/login");
+    }
+  }
+
   if (error) return <CenteredMessage tone="error">{error}</CenteredMessage>;
   if (!orgId || events === null) return <CenteredMessage>{t("common.loading")}</CenteredMessage>;
 
@@ -69,7 +92,12 @@ export default function DashboardEventsPage() {
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">{t("dashboard.events.title")}</h1>
-          <LocaleToggle />
+          <div className="flex items-center gap-4">
+            <LocaleToggle />
+            <button type="button" onClick={handleLogout} className="text-sm text-neutral-500 underline">
+              {t("dashboard.events.logout")}
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-col gap-4">

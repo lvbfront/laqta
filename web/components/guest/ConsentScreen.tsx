@@ -4,7 +4,13 @@ import { useState } from "react";
 import { useLocale } from "@/components/LocaleProvider";
 import type { EventPublic } from "@/lib/api";
 
-export function ConsentScreen({ event, onAgree }: { event: EventPublic; onAgree: () => void }) {
+export function ConsentScreen({
+  event,
+  onAgree,
+}: {
+  event: EventPublic;
+  onAgree: (path: "face" | "code") => void;
+}) {
   const { t, locale } = useLocale();
   // Never pre-ticked, on purpose -- this is the one checkbox in the app
   // that must never default to checked, per CLAUDE.md.
@@ -12,6 +18,8 @@ export function ConsentScreen({ event, onAgree }: { event: EventPublic; onAgree:
 
   const consentText = locale === "ar" ? event.consent_text_ar : event.consent_text_en;
   const eventName = locale === "ar" ? event.name_ar : event.name_en;
+  const showFaceButton = event.match_mode === "face" || event.match_mode === "both";
+  const showCodeButton = event.match_mode === "code" || event.match_mode === "both";
 
   return (
     <div className="flex min-h-[100dvh] flex-col justify-between p-6">
@@ -38,20 +46,40 @@ export function ConsentScreen({ event, onAgree }: { event: EventPublic; onAgree:
             onChange={(e) => setChecked(e.target.checked)}
             className="mt-0.5 h-6 w-6 shrink-0 rounded border-neutral-300"
           />
-          <span className="text-sm font-medium">{t("consent.checkbox")}</span>
+          <span className="text-sm font-medium">
+            {event.match_mode === "code" ? t("consent.checkbox_code") : t("consent.checkbox")}
+          </span>
         </label>
       </div>
 
-      <button
-        type="button"
-        disabled={!checked}
-        onClick={onAgree}
-        className="mt-6 w-full rounded-full bg-neutral-900 py-4 text-lg font-semibold text-white shadow-lg
-                   disabled:bg-neutral-300 disabled:shadow-none
-                   active:scale-[0.98] transition"
-      >
-        {t("consent.continue")}
-      </button>
+      <div className="mt-6 flex flex-col gap-3 max-w-md mx-auto w-full">
+        {showFaceButton && (
+          <button
+            type="button"
+            disabled={!checked}
+            onClick={() => onAgree("face")}
+            className="w-full rounded-full bg-neutral-900 py-4 text-lg font-semibold text-white shadow-lg
+                       disabled:bg-neutral-300 disabled:shadow-none
+                       active:scale-[0.98] transition"
+          >
+            {showCodeButton ? t("capture.title") : t("consent.continue")}
+          </button>
+        )}
+        {showCodeButton && (
+          <button
+            type="button"
+            disabled={!checked}
+            onClick={() => onAgree("code")}
+            className={
+              showFaceButton
+                ? "w-full rounded-full border-2 border-neutral-900 py-4 text-lg font-semibold text-neutral-900 disabled:border-neutral-300 disabled:text-neutral-300 active:scale-[0.98] transition"
+                : "w-full rounded-full bg-neutral-900 py-4 text-lg font-semibold text-white shadow-lg disabled:bg-neutral-300 disabled:shadow-none active:scale-[0.98] transition"
+            }
+          >
+            {showFaceButton ? t("guest.code_title") : t("consent.continue")}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { CenteredMessage } from "@/components/CenteredMessage";
@@ -8,14 +9,17 @@ import { useLocale } from "@/components/LocaleProvider";
 import { LocaleToggle } from "@/components/LocaleToggle";
 import * as api from "@/lib/api";
 import type { EventDetail, PhotoListItem } from "@/lib/api";
+import { clearToken, getToken } from "@/lib/auth";
 
 export default function ModeratePage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const { t, locale } = useLocale();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [photos, setPhotos] = useState<PhotoListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [codeDrafts, setCodeDrafts] = useState<Record<string, string>>({});
 
   async function refresh() {
     const [ev, readyPhotos] = await Promise.all([api.getEvent(params.id), api.listPhotos(params.id, "ready")]);
@@ -26,11 +30,32 @@ export default function ModeratePage() {
     // rejected photo also has published=false, so (Phase 1 limitation,
     // no separate "rejected" state in the schema) it will reappear here
     // rather than staying dismissed -- see app/api/routes/photos.py.
-    setPhotos(readyPhotos.filter((p) => !p.published));
+    //
+    // Exception: a code-mode event's photos still need someone to type in
+    // a bib/badge code, and with privacy_mode='standard' (the common case)
+    // auto_publish means a photo is *already* published the moment it's
+    // ready -- it would never reach this page at all under the
+    // unpublished-only filter, and staff would have no way to tag it.
+    // Code-mode events therefore show every ready photo here, published or
+    // not; approve/reject remain available too (still meaningful for a
+    // strict code-mode event, or to unpublish a mistagged photo).
+    const showAllReady = ev.match_mode === "code" || ev.match_mode === "both";
+    setPhotos(showAllReady ? readyPhotos : readyPhotos.filter((p) => !p.published));
   }
 
   useEffect(() => {
-    refresh().catch((err) => setError(err instanceof api.ApiError ? err.message : t("error.generic")));
+    if (!getToken()) {
+      router.replace("/login");
+      return;
+    }
+    refresh().catch((err) => {
+      if (err instanceof api.ApiError && err.status === 401) {
+        clearToken();
+        router.replace("/login");
+        return;
+      }
+      setError(err instanceof api.ApiError ? err.message : t("error.generic"));
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
@@ -50,10 +75,36 @@ export default function ModeratePage() {
     }
   }
 
+  async function handleAddCode(photoId: string) {
+    const code = (codeDrafts[photoId] ?? "").trim();
+    if (!code) return;
+    try {
+      const result = await api.addPhotoCode(params.id, photoId, code);
+      setPhotos((prev) =>
+        prev ? prev.map((p) => (p.id === photoId ? { ...p, codes: result.codes } : p)) : prev
+      );
+      setCodeDrafts((prev) => ({ ...prev, [photoId]: "" }));
+    } catch {
+      // draft stays filled in so the organizer can retry
+    }
+  }
+
+  async function handleRemoveCode(photoId: string, code: string) {
+    try {
+      const result = await api.removePhotoCode(params.id, photoId, code);
+      setPhotos((prev) =>
+        prev ? prev.map((p) => (p.id === photoId ? { ...p, codes: result.codes } : p)) : prev
+      );
+    } catch {
+      // no-op -- the tag stays visible so the organizer can retry
+    }
+  }
+
   if (error) return <CenteredMessage tone="error">{error}</CenteredMessage>;
   if (!event || photos === null) return <CenteredMessage>{t("common.loading")}</CenteredMessage>;
 
   const name = locale === "ar" ? event.name_ar : event.name_en;
+  const showCodeTagging = event.match_mode === "code" || event.match_mode === "both";
 
   return (
     <div className="min-h-[100dvh] p-4 sm:p-8">
@@ -81,6 +132,51 @@ export default function ModeratePage() {
                       <img src={photo.thumbnail_url} alt="" className="h-full w-full object-cover" />
                     )}
                   </div>
+
+                  {showCodeTagging && (
+                    <div className="px-3 pt-3">
+                      <p className="text-[11px] font-medium text-neutral-500 mb-1">
+                        {t("dashboard.moderate.codes_label")}
+                      </p>
+                      {photo.codes.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {photo.codes.map((code) => (
+                            <button
+                              key={code}
+                              type="button"
+                              onClick={() => handleRemoveCode(photo.id, code)}
+                              className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700"
+                              title={code}
+                            >
+                              {code} ×
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-1">
+                        <input
+                          value={codeDrafts[photo.id] ?? ""}
+                          onChange={(e) => setCodeDrafts((prev) => ({ ...prev, [photo.id]: e.target.value }))}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddCode(photo.id);
+                            }
+                          }}
+                          placeholder={t("dashboard.moderate.codes_placeholder")}
+                          className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-2 py-1 text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAddCode(photo.id)}
+                          className="rounded-lg bg-neutral-900 px-2 py-1 text-xs font-medium text-white shrink-0"
+                        >
+                          {t("dashboard.moderate.codes_add")}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="p-3 flex gap-2">
                     <button
                       type="button"

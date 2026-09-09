@@ -16,6 +16,7 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     // Guest: consent
     "consent.title": "قبل أن نبدأ",
     "consent.checkbox": "أوافق على استخدام صورة وجهي مؤقتًا للبحث عن صوري في هذا الحدث",
+    "consent.checkbox_code": "أوافق على استخدام رمز الشارة الخاص بي للبحث عن صوري في هذا الحدث",
     "consent.continue": "متابعة",
     "consent.privacy_strict_note": "هذا حدث خاص: لا يمكن لأحد تصفح الصور، وتُحذف بياناتك خلال 7 أيام من انتهاء الحدث.",
     "consent.privacy_standard_note": "تُحذف بياناتك تلقائيًا خلال 30 يومًا من انتهاء الحدث.",
@@ -83,6 +84,33 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     "dashboard.moderate.reject": "رفض",
     "dashboard.moderate.back": "رجوع إلى الفعاليات",
 
+    "dashboard.events.match_mode": "طريقة المطابقة",
+    "dashboard.events.match_mode_face": "سيلفي (تعرف على الوجه)",
+    "dashboard.events.match_mode_code": "رمز (سوار/شارة، بدون بيانات حيوية)",
+    "dashboard.events.match_mode_both": "كلاهما",
+    "dashboard.events.logout": "تسجيل الخروج",
+
+    "dashboard.moderate.codes_label": "رموز الشارة/السوار",
+    "dashboard.moderate.codes_placeholder": "أدخل رمزًا",
+    "dashboard.moderate.codes_add": "إضافة",
+
+    "auth.login_title": "تسجيل الدخول",
+    "auth.register_title": "إنشاء حساب منظِّم",
+    "auth.org_name": "اسم المنظمة",
+    "auth.email": "البريد الإلكتروني",
+    "auth.password": "كلمة المرور",
+    "auth.login_submit": "دخول",
+    "auth.register_submit": "إنشاء حساب",
+    "auth.switch_to_register": "ليس لديك حساب؟ أنشئ واحدًا",
+    "auth.switch_to_login": "لديك حساب بالفعل؟ سجّل الدخول",
+    "auth.submitting": "جارٍ الإرسال...",
+
+    "guest.code_title": "أدخل رمز الشارة",
+    "guest.code_instructions": "أدخل الرمز الموجود على شارتك أو سوارك للعثور على صورك",
+    "guest.code_placeholder": "مثال: BIB1234",
+    "guest.code_submit": "بحث",
+    "guest.code_searching": "جارِ البحث...",
+
     "common.loading": "جارِ التحميل...",
     "common.back": "رجوع",
   },
@@ -92,6 +120,7 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
 
     "consent.title": "Before we start",
     "consent.checkbox": "I consent to my face being used temporarily to find my photos from this event",
+    "consent.checkbox_code": "I consent to my badge code being used to find my photos from this event",
     "consent.continue": "Continue",
     "consent.privacy_strict_note": "This is a private event: no one can browse the photos, and your data is deleted within 7 days of the event ending.",
     "consent.privacy_standard_note": "Your data is automatically deleted within 30 days of the event ending.",
@@ -154,6 +183,33 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     "dashboard.moderate.approve": "Approve",
     "dashboard.moderate.reject": "Reject",
     "dashboard.moderate.back": "Back to events",
+
+    "dashboard.events.match_mode": "Match mode",
+    "dashboard.events.match_mode_face": "Selfie (face recognition)",
+    "dashboard.events.match_mode_code": "Code (wristband/badge, no biometric data)",
+    "dashboard.events.match_mode_both": "Both",
+    "dashboard.events.logout": "Log out",
+
+    "dashboard.moderate.codes_label": "Bib/badge codes",
+    "dashboard.moderate.codes_placeholder": "Enter a code",
+    "dashboard.moderate.codes_add": "Add",
+
+    "auth.login_title": "Sign in",
+    "auth.register_title": "Create an organizer account",
+    "auth.org_name": "Organization name",
+    "auth.email": "Email",
+    "auth.password": "Password",
+    "auth.login_submit": "Sign in",
+    "auth.register_submit": "Create account",
+    "auth.switch_to_register": "Don't have an account? Create one",
+    "auth.switch_to_login": "Already have an account? Sign in",
+    "auth.submitting": "Submitting...",
+
+    "guest.code_title": "Enter your badge code",
+    "guest.code_instructions": "Enter the code on your badge or wristband to find your photos",
+    "guest.code_placeholder": "e.g. BIB1234",
+    "guest.code_submit": "Search",
+    "guest.code_searching": "Searching...",
 
     "common.loading": "Loading...",
     "common.back": "Back",

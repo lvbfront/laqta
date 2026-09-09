@@ -1,4 +1,11 @@
+import { getToken } from "@/lib/auth";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export class ApiError extends Error {
   status: number;
@@ -72,6 +79,14 @@ export async function matchSelfie(eventId: string, selfie: Blob, consent: boolea
   return res.json();
 }
 
+export function matchByCode(eventId: string, code: string): Promise<MatchResponse> {
+  return getJson<MatchResponse>(`/api/events/${eventId}/match/code`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+}
+
 export function getSignedPhotoUrl(
   photoId: string,
   sessionToken: string,
@@ -100,7 +115,47 @@ export function requestPhotoRemoval(
 }
 
 // ---------------------------------------------------------------------------
-// Dashboard (no auth -- see app/api/routes/events.py on the backend)
+// Auth (see api/app/api/routes/auth.py)
+// ---------------------------------------------------------------------------
+
+export interface CurrentUser {
+  id: string;
+  org_id: string;
+  email: string;
+  role: "owner" | "staff" | "photographer" | "moderator";
+}
+
+export interface AuthResponse {
+  session_token: string;
+  user: CurrentUser;
+}
+
+export function register(input: { org_name: string; email: string; password: string }): Promise<AuthResponse> {
+  return getJson<AuthResponse>("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function login(input: { email: string; password: string }): Promise<AuthResponse> {
+  return getJson<AuthResponse>("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function logout(): Promise<void> {
+  await fetch(`${API_URL}/api/auth/logout`, { method: "POST", headers: authHeaders() });
+}
+
+export function me(): Promise<CurrentUser> {
+  return getJson<CurrentUser>("/api/auth/me", { headers: authHeaders() });
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard (bearer-token auth -- see api/app/api/deps.py on the backend)
 // ---------------------------------------------------------------------------
 
 export interface EventDetail extends EventPublic {
@@ -119,19 +174,16 @@ export interface PhotoListItem {
   status: "pending" | "processing" | "ready" | "failed";
   published: boolean;
   thumbnail_url: string | null;
+  codes: string[];
   created_at: string;
 }
 
-export function getDefaultOrganization(): Promise<{ id: string; name: string }> {
-  return getJson("/api/dashboard/organization");
-}
-
 export function listOrgEvents(orgId: string): Promise<EventDetail[]> {
-  return getJson(`/api/organizations/${orgId}/events`);
+  return getJson(`/api/organizations/${orgId}/events`, { headers: authHeaders() });
 }
 
 export function getEvent(eventId: string): Promise<EventDetail> {
-  return getJson(`/api/events/${eventId}`);
+  return getJson(`/api/events/${eventId}`, { headers: authHeaders() });
 }
 
 export interface CreateEventInput {
@@ -139,25 +191,30 @@ export interface CreateEventInput {
   name_en: string;
   ends_at: string; // ISO datetime
   privacy_mode: "standard" | "strict";
+  match_mode: "face" | "code" | "both";
 }
 
 export function createEvent(orgId: string, body: CreateEventInput): Promise<EventDetail> {
   return getJson(`/api/organizations/${orgId}/events`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(body),
   });
 }
 
 export function listPhotos(eventId: string, status?: string): Promise<PhotoListItem[]> {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
-  return getJson(`/api/events/${eventId}/photos${query}`);
+  return getJson(`/api/events/${eventId}/photos${query}`, { headers: authHeaders() });
 }
 
 export async function uploadPhotos(eventId: string, files: File[]): Promise<void> {
   const form = new FormData();
   for (const file of files) form.append("files", file);
-  const res = await fetch(`${API_URL}/api/events/${eventId}/photos`, { method: "POST", body: form });
+  const res = await fetch(`${API_URL}/api/events/${eventId}/photos`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: form,
+  });
   if (!res.ok) await throwApiError(res);
 }
 
@@ -166,5 +223,31 @@ export function moderatePhoto(
   photoId: string,
   action: "approve" | "reject"
 ): Promise<{ id: string; status: string; published: boolean }> {
-  return getJson(`/api/events/${eventId}/photos/${photoId}/moderate?action=${action}`, { method: "POST" });
+  return getJson(`/api/events/${eventId}/photos/${photoId}/moderate?action=${action}`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+}
+
+export function addPhotoCode(
+  eventId: string,
+  photoId: string,
+  code: string
+): Promise<{ photo_id: string; codes: string[] }> {
+  return getJson(`/api/events/${eventId}/photos/${photoId}/codes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ code }),
+  });
+}
+
+export function removePhotoCode(
+  eventId: string,
+  photoId: string,
+  code: string
+): Promise<{ photo_id: string; codes: string[] }> {
+  return getJson(`/api/events/${eventId}/photos/${photoId}/codes/${encodeURIComponent(code)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
 }

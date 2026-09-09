@@ -12,6 +12,7 @@ export function CreateEventForm({ orgId, onCreated }: { orgId: string; onCreated
   const [nameEn, setNameEn] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [privacyMode, setPrivacyMode] = useState<"standard" | "strict">("standard");
+  const [matchMode, setMatchMode] = useState<"face" | "code" | "both">("face");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,12 +29,14 @@ export function CreateEventForm({ orgId, onCreated }: { orgId: string; onCreated
         name_en: nameEn.trim(),
         ends_at: new Date(endsAt).toISOString(),
         privacy_mode: privacyMode,
+        match_mode: matchMode,
       });
       onCreated(event);
       setNameAr("");
       setNameEn("");
       setEndsAt("");
       setPrivacyMode("standard");
+      setMatchMode("face");
       setOpen(false);
     } catch (err) {
       setError(err instanceof api.ApiError ? err.message : t("error.generic"));
@@ -96,6 +99,18 @@ export function CreateEventForm({ orgId, onCreated }: { orgId: string; onCreated
           >
             <option value="standard">{t("dashboard.events.privacy_standard")}</option>
             <option value="strict">{t("dashboard.events.privacy_strict")}</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium text-neutral-700">{t("dashboard.events.match_mode")}</span>
+          <select
+            value={matchMode}
+            onChange={(e) => setMatchMode(e.target.value as "face" | "code" | "both")}
+            className="rounded-lg border border-neutral-300 px-3 py-2"
+          >
+            <option value="face">{t("dashboard.events.match_mode_face")}</option>
+            <option value="code">{t("dashboard.events.match_mode_code")}</option>
+            <option value="both">{t("dashboard.events.match_mode_both")}</option>
           </select>
         </label>
       </div>
