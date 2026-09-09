@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.formparsers import MultiPartParser
 
-from app.api.routes import delivery, events, match, photos
+from app.api.routes import auth, delivery, events, match, photos
 from app.config import settings
 from app.storage import minio_client
 
@@ -74,16 +74,18 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="Laqta API",
-    description="Event photo delivery platform — core matching loop (Phase 1).",
-    version="0.1.0",
+    description="Event photo delivery platform.",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
 # The Next.js dev server runs natively on the host (not in Docker, see
 # CLAUDE.md), on a different origin/port than the API -- browser requests
-# from it are cross-origin. Phase 1 has no auth/cookies to protect here
-# (see app/api/routes/events.py), so a permissive dev-only CORS policy is
-# the pragmatic choice, not a hardened one; tighten this to an explicit
+# from it are cross-origin. Auth is bearer-token-in-header (Authorization),
+# not cookies, specifically so a wildcard origin here doesn't also imply
+# CSRF exposure the way it would with cookie-based credentials -- a
+# malicious page on another origin can't attach a token it was never
+# given. Still dev-only permissiveness, though: tighten to an explicit
 # origin allowlist before this is ever exposed beyond localhost.
 app.add_middleware(
     CORSMiddleware,
@@ -98,6 +100,7 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+app.include_router(auth.router)
 app.include_router(photos.router)
 app.include_router(match.router)
 app.include_router(delivery.router)

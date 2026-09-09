@@ -16,6 +16,7 @@ from app.models.enums import PhotoStatus
 if TYPE_CHECKING:
     from app.models.event import Event
     from app.models.face import Face
+    from app.models.photo_code import PhotoCode
     from app.models.photographer import Photographer
     from app.models.user import User
 
@@ -74,6 +75,7 @@ class Photo(Base, UUIDPKMixin, TimestampMixin):
     photographer: Mapped["Photographer | None"] = relationship(back_populates="photos")
     moderator: Mapped["User | None"] = relationship(foreign_keys=[moderated_by])
     faces: Mapped[list["Face"]] = relationship(back_populates="photo", cascade="all, delete-orphan")
+    codes: Mapped[list["PhotoCode"]] = relationship(back_populates="photo", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Photo {self.id} status={self.status} published={self.published}>"

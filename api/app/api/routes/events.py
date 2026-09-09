@@ -8,10 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.api.deps import require_event_access, require_org_member, require_role
 from app.db import get_db
-from app.models.enums import AccountType, EventStatus, MatchMode, PhotoStatus, PrivacyMode
+from app.models.enums import EventStatus, MatchMode, PhotoStatus, PrivacyMode, UserRole
 from app.models.event import Event
-from app.models.organization import Organization
 from app.models.photo import Photo
 
 router = APIRouter(tags=["events"])
@@ -25,12 +25,18 @@ DEFAULT_CONSENT_EN = (
     "this event. Your selfie is never stored — only a numeric code is computed from it, then it's discarded."
 )
 
-# Phase 1 has no login/auth system at all (never part of the numbered
-# backend steps) -- the dashboard operates against a single, implicit
-# development organization rather than real multi-tenant accounts. This
-# is a deliberate, documented Phase 1 simplification, not an oversight;
-# see the README's "Dashboard API" section.
-_DEFAULT_ORG_NAME = "Dev Organization"
+# match_mode='code' events never touch a face -- the default consent text
+# above is actively wrong for them (it promises face processing that
+# never happens). Used whenever the caller doesn't supply their own
+# consent_text_*, same as the face-mode defaults.
+DEFAULT_CONSENT_AR_CODE = (
+    "لإيجاد صورك من هذا الحدث، أدخل رقم الشريحة أو الشارة الخاص بك. "
+    "لن نطلب صورة وجهك أو نعالج أي بيانات حيوية على الإطلاق."
+)
+DEFAULT_CONSENT_EN_CODE = (
+    "To find your photos from this event, enter your bib or badge code. "
+    "We never ask for a selfie or process any biometric data for this event."
+)
 
 
 class EventPublic(BaseModel):
@@ -93,9 +99,11 @@ def _event_to_detail(db: Session, event: Event) -> EventDetail:
 
 @router.get("/api/events/by-token/{qr_token}", response_model=EventPublic)
 def get_event_by_qr_token(qr_token: str, db: Annotated[Session, Depends(get_db)]) -> EventPublic:
-    """Public, unauthenticated -- the qr_token itself is the access
-    control (unguessable, see Event._generate_qr_token). This is the only
-    lookup the guest-facing /e/[qr_token] page needs before consent.
+    """Public, unauthenticated -- deliberately so, unlike every other route
+    in this file. The qr_token itself is the access control (unguessable,
+    see Event._generate_qr_token). This is the only lookup the guest-facing
+    /e/[qr_token] page needs before consent; guests never have a user
+    account or session token.
     """
     event = db.query(Event).filter(Event.qr_token == qr_token).first()
     if event is None:
@@ -113,41 +121,31 @@ def get_event_by_qr_token(qr_token: str, db: Annotated[Session, Depends(get_db)]
 
 
 @router.get("/api/events/{event_id}", response_model=EventDetail)
-def get_event(event_id: uuid.UUID, db: Annotated[Session, Depends(get_db)]) -> EventDetail:
-    event = db.get(Event, event_id)
-    if event is None:
-        raise HTTPException(status_code=404, detail={"code": "event_not_found", "message": "Event not found."})
+def get_event(
+    db: Annotated[Session, Depends(get_db)],
+    event: Annotated[Event, Depends(require_event_access)],
+) -> EventDetail:
     return _event_to_detail(db, event)
 
 
-@router.get("/api/dashboard/organization")
-def get_default_organization(db: Annotated[Session, Depends(get_db)]) -> dict:
-    """Get-or-create the single implicit dev organization the dashboard
-    operates against (no auth system exists to pick a real one from).
-    """
-    org = db.query(Organization).filter(Organization.name == _DEFAULT_ORG_NAME).first()
-    if org is None:
-        org = Organization(name=_DEFAULT_ORG_NAME, account_type=AccountType.organizer)
-        db.add(org)
-        db.commit()
-    return {"id": str(org.id), "name": org.name}
-
-
 @router.get("/api/organizations/{org_id}/events", response_model=list[EventDetail])
-def list_org_events(org_id: uuid.UUID, db: Annotated[Session, Depends(get_db)]) -> list[EventDetail]:
-    org = db.get(Organization, org_id)
-    if org is None:
-        raise HTTPException(status_code=404, detail={"code": "organization_not_found", "message": "Organization not found."})
+def list_org_events(
+    org_id: uuid.UUID,
+    db: Annotated[Session, Depends(get_db)],
+    _member: Annotated[object, Depends(require_org_member)],
+) -> list[EventDetail]:
     events = db.query(Event).filter(Event.org_id == org_id).order_by(Event.created_at.desc()).all()
     return [_event_to_detail(db, e) for e in events]
 
 
 @router.post("/api/organizations/{org_id}/events", response_model=EventDetail, status_code=201)
-def create_event(org_id: uuid.UUID, body: EventCreate, db: Annotated[Session, Depends(get_db)]) -> EventDetail:
-    org = db.get(Organization, org_id)
-    if org is None:
-        raise HTTPException(status_code=404, detail={"code": "organization_not_found", "message": "Organization not found."})
-
+def create_event(
+    org_id: uuid.UUID,
+    body: EventCreate,
+    db: Annotated[Session, Depends(get_db)],
+    _member: Annotated[object, Depends(require_org_member)],
+    _role: Annotated[object, Depends(require_role(UserRole.owner, UserRole.staff))],
+) -> EventDetail:
     event = Event(
         org_id=org_id,
         name_ar=body.name_ar,
@@ -155,8 +153,10 @@ def create_event(org_id: uuid.UUID, body: EventCreate, db: Annotated[Session, De
         starts_at=body.starts_at,
         ends_at=body.ends_at,
         status=EventStatus.active,
-        consent_text_ar=body.consent_text_ar or DEFAULT_CONSENT_AR,
-        consent_text_en=body.consent_text_en or DEFAULT_CONSENT_EN,
+        consent_text_ar=body.consent_text_ar
+        or (DEFAULT_CONSENT_AR_CODE if body.match_mode == MatchMode.code else DEFAULT_CONSENT_AR),
+        consent_text_en=body.consent_text_en
+        or (DEFAULT_CONSENT_EN_CODE if body.match_mode == MatchMode.code else DEFAULT_CONSENT_EN),
         privacy_mode=body.privacy_mode,
         match_mode=body.match_mode,
         # DB check constraint forces this false for strict events

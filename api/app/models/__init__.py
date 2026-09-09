@@ -11,8 +11,10 @@ from app.models.guest_face import GuestFace
 from app.models.match import Match
 from app.models.organization import Organization
 from app.models.photo import Photo
+from app.models.photo_code import PhotoCode
 from app.models.photographer import Photographer
 from app.models.user import User
+from app.models.user_session import UserSession
 
 __all__ = [
     "AuditLog",
@@ -24,6 +26,8 @@ __all__ = [
     "Match",
     "Organization",
     "Photo",
+    "PhotoCode",
     "Photographer",
     "User",
+    "UserSession",
 ]

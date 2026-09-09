@@ -13,11 +13,13 @@ from sqlalchemy.orm import Session
 from app.api.utils import client_ip
 from app.config import settings
 from app.db import get_db
+from app.models.enums import MatchMode
 from app.models.event import Event
 from app.models.guest import Guest
 from app.models.guest_face import GuestFace
 from app.models.match import Match
 from app.models.photo import Photo
+from app.models.photo_code import PhotoCode
 from app.services import image_ops
 from app.services.face_model import DetectedFace, detect_and_embed
 from app.services.face_search import search_faces
@@ -113,6 +115,19 @@ async def match_selfie(
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(status_code=404, detail={"code": "event_not_found", "message": "Event not found."})
+    if event.match_mode == MatchMode.code:
+        # A code-only event's whole point is that no biometric data is
+        # ever processed for it (docs/plan.md) -- refusing here is what
+        # actually makes that a guarantee rather than a UI convention a
+        # guest (or a frontend bug) could bypass by hitting this endpoint
+        # directly.
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "wrong_match_mode",
+                "message": "This event uses code-based matching, not selfies.",
+            },
+        )
 
     if not consent:
         raise HTTPException(
@@ -206,5 +221,73 @@ async def match_selfie(
         db.add(Match(guest_id=guest.id, photo_id=m.photo_id, score=m.score))
 
     db.commit()
+
+    return MatchResponse(guest_session_token=guest.session_token, matches=matches)
+
+
+class CodeMatchRequest(BaseModel):
+    code: str
+
+
+@router.post("/code", response_model=MatchResponse)
+def match_by_code(
+    event_id: uuid.UUID,
+    request: Request,
+    body: CodeMatchRequest,
+    db: Annotated[Session, Depends(get_db)],
+) -> MatchResponse:
+    """No selfie, no embedding, no face pipeline touched at all -- a plain
+    DB lookup against codes staff tagged onto photos
+    (app.api.routes.photos.add_photo_code). This is what match_mode='code'
+    is for: conservative clients who won't accept biometric processing at
+    all (docs/plan.md's §7.2 women's-events wedge and the marathons/
+    schools use case both lean on this). Nothing here imports/calls
+    anything from app.services.face_model or app.workers.pipeline --
+    face_model's own insightface/onnxruntime imports are already lazy
+    (deferred to first call, not module import -- see face_model.py), so
+    a code-match request never pays any face-pipeline cost, not even a
+    model load, regardless of what else this file imports for the selfie
+    endpoint above.
+    """
+    event = db.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail={"code": "event_not_found", "message": "Event not found."})
+    if event.match_mode == MatchMode.face:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "wrong_match_mode", "message": "This event uses selfie matching, not codes."},
+        )
+
+    code = body.code.strip()
+    if not code:
+        raise HTTPException(status_code=422, detail={"code": "empty_code", "message": "Enter your code."})
+
+    # No consent flag, no guest_faces row -- there is no biometric
+    # collection happening here to consent to. A Guest row still gets
+    # created (session/audit trail, and matches needs a guest_id to hang
+    # off of), just without anything selfie-shaped attached to it.
+    guest = Guest(
+        event_id=event_id,
+        consent_at=datetime.now(timezone.utc),
+        consent_ip=client_ip(request),
+    )
+    db.add(guest)
+    db.flush()
+
+    photo_ids = {
+        row.photo_id
+        for row in db.query(PhotoCode.photo_id)
+        .join(Photo, Photo.id == PhotoCode.photo_id)
+        .filter(Photo.event_id == event_id, PhotoCode.code == code, Photo.published.is_(True))
+    }
+
+    matches = [PhotoMatchResult(photo_id=pid, score=1.0) for pid in photo_ids]
+
+    for m in matches:
+        db.add(Match(guest_id=guest.id, photo_id=m.photo_id, score=m.score))
+
+    db.commit()
+
+    logger.debug("code match event=%s guest=%s code=%r found=%d", event_id, guest.id, code, len(matches))
 
     return MatchResponse(guest_session_token=guest.session_token, matches=matches)

@@ -1,24 +1,19 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timedelta, timezone
 
-from app.models.event import Event
-from app.models.organization import Organization
-from tests.factories import make_event, make_organization, make_photo
+from tests.factories import auth_headers, make_event, make_organization, make_photo, make_user
 
 
-def test_get_or_create_default_organization_is_idempotent(client):
-    first = client.get("/api/dashboard/organization")
-    second = client.get("/api/dashboard/organization")
-    assert first.status_code == 200
-    assert first.json()["id"] == second.json()["id"]
-
-
-def test_create_event_computes_retention_and_forces_strict_auto_publish(client):
-    org_id = client.get("/api/dashboard/organization").json()["id"]
+def test_create_event_computes_retention_and_forces_strict_auto_publish(client, db_session):
+    org = make_organization(db_session)
+    user = make_user(db_session, org)
+    headers = auth_headers(db_session, user)
 
     resp = client.post(
-        f"/api/organizations/{org_id}/events",
+        f"/api/organizations/{org.id}/events",
+        headers=headers,
         json={
             "name_ar": "ح",
             "name_en": "Strict Event",
@@ -33,10 +28,14 @@ def test_create_event_computes_retention_and_forces_strict_auto_publish(client):
     assert body["qr_token"]
 
 
-def test_created_event_is_findable_by_qr_token_and_listed_for_its_org(client):
-    org_id = client.get("/api/dashboard/organization").json()["id"]
+def test_created_event_is_findable_by_qr_token_and_listed_for_its_org(client, db_session):
+    org = make_organization(db_session)
+    user = make_user(db_session, org)
+    headers = auth_headers(db_session, user)
+
     created = client.post(
-        f"/api/organizations/{org_id}/events",
+        f"/api/organizations/{org.id}/events",
+        headers=headers,
         json={
             "name_ar": "ح",
             "name_en": "Findable Event",
@@ -44,13 +43,14 @@ def test_created_event_is_findable_by_qr_token_and_listed_for_its_org(client):
         },
     ).json()
 
+    # Public, unauthenticated -- the qr_token itself is the access control.
     by_token = client.get(f"/api/events/by-token/{created['qr_token']}")
     assert by_token.status_code == 200
     assert by_token.json()["id"] == created["id"]
     # public lookup must not leak internal-only fields
     assert "qr_token" not in by_token.json()
 
-    listing = client.get(f"/api/organizations/{org_id}/events")
+    listing = client.get(f"/api/organizations/{org.id}/events", headers=headers)
     assert any(e["id"] == created["id"] for e in listing.json())
 
 
@@ -61,35 +61,48 @@ def test_event_by_token_404_for_unknown_token(client):
 
 def test_list_photos_filters_by_status_and_moderate_flips_published(client, db_session):
     org = make_organization(db_session)
+    user = make_user(db_session, org)
+    headers = auth_headers(db_session, user)
     event = make_event(db_session, org, auto_publish=True)
     photo = make_photo(db_session, event, published=False)
     db_session.flush()
 
-    all_photos = client.get(f"/api/events/{event.id}/photos").json()
+    all_photos = client.get(f"/api/events/{event.id}/photos", headers=headers).json()
     assert len(all_photos) == 1
     assert all_photos[0]["published"] is False
 
-    ready_only = client.get(f"/api/events/{event.id}/photos", params={"status": "ready"}).json()
+    ready_only = client.get(
+        f"/api/events/{event.id}/photos", params={"status": "ready"}, headers=headers
+    ).json()
     assert len(ready_only) == 1
 
-    none_pending = client.get(f"/api/events/{event.id}/photos", params={"status": "pending"}).json()
+    none_pending = client.get(
+        f"/api/events/{event.id}/photos", params={"status": "pending"}, headers=headers
+    ).json()
     assert none_pending == []
 
-    approve = client.post(f"/api/events/{event.id}/photos/{photo.id}/moderate", params={"action": "approve"})
+    approve = client.post(
+        f"/api/events/{event.id}/photos/{photo.id}/moderate", params={"action": "approve"}, headers=headers
+    )
     assert approve.status_code == 200
     assert approve.json()["published"] is True
 
-    reject = client.post(f"/api/events/{event.id}/photos/{photo.id}/moderate", params={"action": "reject"})
+    reject = client.post(
+        f"/api/events/{event.id}/photos/{photo.id}/moderate", params={"action": "reject"}, headers=headers
+    )
     assert reject.json()["published"] is False
 
 
 def test_moderate_unknown_photo_404s(client, db_session):
     org = make_organization(db_session)
+    user = make_user(db_session, org)
+    headers = auth_headers(db_session, user)
     event = make_event(db_session, org)
     db_session.flush()
-    import uuid
 
     resp = client.post(
-        f"/api/events/{event.id}/photos/{uuid.uuid4()}/moderate", params={"action": "approve"}
+        f"/api/events/{event.id}/photos/{uuid.uuid4()}/moderate",
+        params={"action": "approve"},
+        headers=headers,
     )
     assert resp.status_code == 404

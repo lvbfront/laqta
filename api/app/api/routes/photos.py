@@ -1,26 +1,33 @@
 from __future__ import annotations
 
-import hashlib
 import uuid
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api.deps import require_event_access, require_role
 from app.config import settings
 from app.db import get_db
 from app.models.audit_log import AuditLog
-from app.models.enums import PhotoStatus
+from app.models.enums import PhotoStatus, UserRole
 from app.models.event import Event
 from app.models.photo import Photo
+from app.models.photo_code import PhotoCode
+from app.models.user import User
+from app.services.ingest import ingest_photo
 from app.storage import minio_client
-from app.workers.jobs import process_photo
-from app.workers.queue import get_photo_processing_queue
 
 router = APIRouter(prefix="/api/events/{event_id}/photos", tags=["photos"])
+
+# Who may do what to an event's photos. Ingest includes 'photographer'
+# (cameras/staff pushing bursts, not just owner/staff); moderation and
+# code-tagging are staff-review actions, so 'photographer' is deliberately
+# left out of those two.
+INGEST_ROLES = (UserRole.owner, UserRole.staff, UserRole.photographer)
+MODERATE_ROLES = (UserRole.owner, UserRole.staff, UserRole.moderator)
 
 
 class PhotoUploadResult(BaseModel):
@@ -35,75 +42,35 @@ class PhotoBatchUploadResponse(BaseModel):
     results: list[PhotoUploadResult]
 
 
-def _original_key(event_id: uuid.UUID, photo_id: uuid.UUID) -> str:
-    return f"events/{event_id}/photos/{photo_id}/original.jpg"
-
-
-def _find_by_md5(db: Session, event_id: uuid.UUID, md5: str) -> Photo | None:
-    return db.query(Photo).filter(Photo.event_id == event_id, Photo.md5 == md5).first()
-
-
 @router.post("", response_model=PhotoBatchUploadResponse, status_code=201)
 async def upload_photos(
-    event_id: uuid.UUID,
     db: Annotated[Session, Depends(get_db)],
+    event: Annotated[Event, Depends(require_event_access)],
+    _role: Annotated[User, Depends(require_role(*INGEST_ROLES))],
     files: Annotated[list[UploadFile], File(...)],
 ) -> PhotoBatchUploadResponse:
-    """Batch photo ingest. No image processing happens here -- cameras
-    send bursts and this must stay fast: read bytes, MD5 dedupe, write the
-    raw upload straight to MinIO, insert a 'pending' photos row, enqueue
-    the worker job, move to the next file. All actual image work (EXIF,
-    thumbnailing, face detection/embedding, and re-stripping the original
-    of GPS) happens in app.workers.jobs.process_photo.
+    """Batch photo ingest over REST -- see app/services/ingest.py for the
+    actual dedupe/MinIO/enqueue logic, shared with the FTPS path
+    (app/ftps/handler.py). No image processing happens here: reading the
+    upload and handing bytes to ingest_photo() is all this does, so
+    bursts stay fast.
     """
-    event = db.get(Event, event_id)
-    if event is None:
-        raise HTTPException(status_code=404, detail="Event not found")
-
-    queue = get_photo_processing_queue()
     results: list[PhotoUploadResult] = []
 
     for upload in files:
         filename = upload.filename or "unnamed"
         try:
             content = await upload.read()
-            if not content:
-                results.append(PhotoUploadResult(filename=filename, status="error", error="empty file"))
-                continue
-
-            md5 = hashlib.md5(content).hexdigest()
-
-            # Fast-path dedupe check -- avoids an unnecessary MinIO upload
-            # in the common case. The DB-level uq_photos_event_md5
-            # constraint (caught below) is what actually guarantees
-            # correctness under concurrent uploads of the same file.
-            existing = _find_by_md5(db, event_id, md5)
-            if existing is not None:
-                results.append(
-                    PhotoUploadResult(filename=filename, status="duplicate", duplicate_of=existing.id)
+            result = ingest_photo(db, event.id, content, upload.content_type or "image/jpeg")
+            results.append(
+                PhotoUploadResult(
+                    filename=filename,
+                    status=result.status,
+                    photo_id=result.photo_id,
+                    duplicate_of=result.duplicate_of,
+                    error=result.error,
                 )
-                continue
-
-            photo = Photo(event_id=event_id, s3_key_original="pending", md5=md5, status=PhotoStatus.pending)
-            db.add(photo)
-            try:
-                db.flush()  # assigns photo.id, and is where the unique constraint fires
-            except IntegrityError:
-                db.rollback()
-                existing = _find_by_md5(db, event_id, md5)
-                results.append(
-                    PhotoUploadResult(filename=filename, status="duplicate", duplicate_of=existing.id if existing else None)
-                )
-                continue
-
-            key = _original_key(event_id, photo.id)
-            photo.s3_key_original = key
-            minio_client.upload_bytes(key, content, upload.content_type or "image/jpeg")
-            db.commit()
-
-            queue.enqueue(process_photo, str(photo.id))
-
-            results.append(PhotoUploadResult(filename=filename, status="queued", photo_id=photo.id))
+            )
         except Exception as exc:  # noqa: BLE001 -- one bad file must not sink the rest of the batch
             db.rollback()
             results.append(PhotoUploadResult(filename=filename, status="error", error=str(exc)))
@@ -116,26 +83,21 @@ class PhotoListItem(BaseModel):
     status: str
     published: bool
     thumbnail_url: str | None
+    codes: list[str]
     created_at: datetime
 
 
 @router.get("", response_model=list[PhotoListItem])
 def list_photos(
-    event_id: uuid.UUID,
     db: Annotated[Session, Depends(get_db)],
+    event: Annotated[Event, Depends(require_event_access)],
     status: str | None = None,
 ) -> list[PhotoListItem]:
-    """Dashboard-side listing (photo grid, moderation queue). No guest
-    scoping here -- this is organizer tooling, not the guest-facing match
-    results, and Phase 1 has no auth to further gate it behind (see
-    app/api/routes/events.py's note on the dashboard's single implicit
-    org). `?status=pending` is what the moderation queue uses.
+    """Dashboard-side listing (photo grid, moderation queue). Any
+    authenticated member of the event's org can view -- `?status=pending`
+    is what the moderation queue uses.
     """
-    event = db.get(Event, event_id)
-    if event is None:
-        raise HTTPException(status_code=404, detail={"code": "event_not_found", "message": "Event not found."})
-
-    query = db.query(Photo).filter(Photo.event_id == event_id)
+    query = db.query(Photo).filter(Photo.event_id == event.id)
     if status:
         query = query.filter(Photo.status == status)
     photos = query.order_by(Photo.created_at.desc()).limit(500).all()
@@ -153,6 +115,7 @@ def list_photos(
                 status=photo.status.value,
                 published=photo.published,
                 thumbnail_url=thumb_url,
+                codes=[c.code for c in photo.codes],
                 created_at=photo.created_at,
             )
         )
@@ -167,16 +130,13 @@ class ModerationResult(BaseModel):
 
 @router.post("/{photo_id}/moderate", response_model=ModerationResult)
 def moderate_photo(
-    event_id: uuid.UUID,
     photo_id: uuid.UUID,
     db: Annotated[Session, Depends(get_db)],
+    event: Annotated[Event, Depends(require_event_access)],
+    user: Annotated[User, Depends(require_role(*MODERATE_ROLES))],
     action: Literal["approve", "reject"],
 ) -> ModerationResult:
-    """No auth (see app/api/routes/events.py) -- `actor` in the audit_log
-    entry is a fixed placeholder rather than a real user id, since there
-    is no logged-in user to attribute this to yet.
-    """
-    photo = db.query(Photo).filter(Photo.id == photo_id, Photo.event_id == event_id).first()
+    photo = db.query(Photo).filter(Photo.id == photo_id, Photo.event_id == event.id).first()
     if photo is None:
         raise HTTPException(status_code=404, detail={"code": "photo_not_found", "message": "Photo not found."})
     if photo.status != PhotoStatus.ready:
@@ -186,15 +146,75 @@ def moderate_photo(
         )
 
     photo.published = action == "approve"
+    photo.moderated_by = user.id
     photo.moderated_at = datetime.now(timezone.utc)
     db.add(
         AuditLog(
-            actor="dashboard:unauthenticated",
+            actor=f"user:{user.id}",
             action=f"moderate_{action}",
             subject=f"photo:{photo.id}",
-            meta={"event_id": str(event_id)},
+            meta={"event_id": str(event.id)},
         )
     )
     db.commit()
 
     return ModerationResult(id=photo.id, status=photo.status.value, published=photo.published)
+
+
+class AddCodeRequest(BaseModel):
+    code: str
+
+
+class PhotoCodesResult(BaseModel):
+    photo_id: uuid.UUID
+    codes: list[str]
+
+
+@router.post("/{photo_id}/codes", response_model=PhotoCodesResult, status_code=201)
+def add_photo_code(
+    photo_id: uuid.UUID,
+    body: AddCodeRequest,
+    db: Annotated[Session, Depends(get_db)],
+    event: Annotated[Event, Depends(require_event_access)],
+    _role: Annotated[User, Depends(require_role(*MODERATE_ROLES))],
+) -> PhotoCodesResult:
+    """Manually tags a bib/badge/wristband code onto a photo -- what
+    match_mode='code' matches against (see app/api/routes/match.py's
+    match_by_code). There's no OCR: staff enter the code themselves,
+    typically while moderating. Idempotent -- re-tagging the same code is
+    a no-op, not an error (uq_photo_codes_photo_code).
+    """
+    photo = db.query(Photo).filter(Photo.id == photo_id, Photo.event_id == event.id).first()
+    if photo is None:
+        raise HTTPException(status_code=404, detail={"code": "photo_not_found", "message": "Photo not found."})
+
+    code = body.code.strip()
+    if not code:
+        raise HTTPException(status_code=422, detail={"code": "empty_code", "message": "Code cannot be empty."})
+
+    existing = db.query(PhotoCode).filter(PhotoCode.photo_id == photo_id, PhotoCode.code == code).first()
+    if existing is None:
+        db.add(PhotoCode(photo_id=photo_id, code=code))
+        db.commit()
+        db.refresh(photo)
+
+    return PhotoCodesResult(photo_id=photo.id, codes=[c.code for c in photo.codes])
+
+
+@router.delete("/{photo_id}/codes/{code}", response_model=PhotoCodesResult)
+def remove_photo_code(
+    photo_id: uuid.UUID,
+    code: str,
+    db: Annotated[Session, Depends(get_db)],
+    event: Annotated[Event, Depends(require_event_access)],
+    _role: Annotated[User, Depends(require_role(*MODERATE_ROLES))],
+) -> PhotoCodesResult:
+    photo = db.query(Photo).filter(Photo.id == photo_id, Photo.event_id == event.id).first()
+    if photo is None:
+        raise HTTPException(status_code=404, detail={"code": "photo_not_found", "message": "Photo not found."})
+
+    db.query(PhotoCode).filter(PhotoCode.photo_id == photo_id, PhotoCode.code == code).delete()
+    db.commit()
+    db.refresh(photo)
+
+    return PhotoCodesResult(photo_id=photo.id, codes=[c.code for c in photo.codes])

@@ -7,11 +7,14 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from app.core.security import hash_password
 from app.models.event import Event
 from app.models.face import Face
-from app.models.enums import AccountType, EventStatus, MatchMode, PhotoStatus, PrivacyMode
+from app.models.enums import AccountType, EventStatus, MatchMode, PhotoStatus, PrivacyMode, UserRole
 from app.models.organization import Organization
 from app.models.photo import Photo
+from app.models.user import User
+from app.models.user_session import UserSession
 
 
 def make_organization(db: Session, **kwargs) -> Organization:
@@ -65,6 +68,30 @@ def make_photo(db: Session, event: Event, **kwargs) -> Photo:
     db.add(photo)
     db.flush()
     return photo
+
+
+def make_user(db: Session, org: Organization | None = None, **kwargs) -> User:
+    org = org or make_organization(db)
+    user = User(
+        org_id=org.id,
+        email=kwargs.get("email", f"{uuid.uuid4().hex}@example.com"),
+        password_hash=kwargs.get("password_hash", hash_password("irrelevant-for-most-tests")),
+        role=kwargs.get("role", UserRole.owner),
+    )
+    db.add(user)
+    db.flush()
+    return user
+
+
+def auth_headers(db: Session, user: User) -> dict[str, str]:
+    """A ready-to-use Authorization header for `user`, backed by a real
+    UserSession row -- same bearer-token mechanics app.api.deps.get_current_user
+    checks, so tests exercise the real auth path rather than bypassing it.
+    """
+    session = UserSession(user_id=user.id, expires_at=now_utc() + timedelta(days=1))
+    db.add(session)
+    db.flush()
+    return {"Authorization": f"Bearer {session.token}"}
 
 
 def make_face(db: Session, photo: Photo, embedding: list[float], det_score: float = 0.9) -> Face:

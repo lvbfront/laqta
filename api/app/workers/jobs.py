@@ -4,7 +4,7 @@ import logging
 import uuid
 
 from app.db import SessionLocal
-from app.models.enums import PhotoStatus
+from app.models.enums import MatchMode, PhotoStatus
 from app.models.face import Face
 from app.models.photo import Photo
 from app.storage import minio_client
@@ -43,7 +43,11 @@ def process_photo(photo_id: str) -> None:
 
         try:
             original_bytes = minio_client.download_bytes(photo.s3_key_original)
-            result = process_photo_bytes(original_bytes)
+            # See pipeline.process_photo_bytes' docstring: a code-mode
+            # event never runs face detection on its photos at all, not
+            # just "doesn't use the result".
+            run_face_detection = photo.event.match_mode != MatchMode.code
+            result = process_photo_bytes(original_bytes, run_face_detection=run_face_detection)
 
             thumbnail_key = minio_client.derived_key(photo.s3_key_original, "thumbnail")
             preview_key = minio_client.derived_key(photo.s3_key_original, "preview")
