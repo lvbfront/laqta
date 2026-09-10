@@ -3,20 +3,18 @@
 A small desktop app for photographers: point it at the folder your
 camera's tethering software (or memory-card import) saves photos to, and
 it uploads each one to Laqta within a couple of seconds of the file
-finishing being written -- no FTP, no URLs, no passwords. This is now
-the primary way photos get into an event (see `docs/plan.md`'s "Tier B"
-path); FTPS (`api/app/ftps/`) remains available for cameras with native
-FTP support.
+finishing being written -- no FTP, no URLs, no passwords.
 
-## Pairing (how a photographer connects it, in one sentence)
+This is one of two fully-supported ways photos get into an event, not a
+replacement for the other: this agent is for a **stationary or booth**
+setup (a laptop stays next to the camera); FTPS (`api/app/ftps/`, see
+`web/app/help/camera` for the full comparison) is for a **photographer
+who moves around the venue** with a camera that has built-in FTP and a
+mobile hotspot, no laptop involved at all. Neither is deprecated or a
+fallback for the other -- which one to use depends on how the shoot is
+run.
 
-An organizer clicks "Pair agent" on an event's dashboard card, gets a
-6-character code good for 15 minutes, reads it to the photographer, who
-types it into this app once -- the app exchanges it for a long-lived
-token (`POST /api/agent/pair`) stored in the OS keychain, and never asks
-for anything else again.
-
-## Running from source (dev)
+## Quick start: run from source (no packaging needed)
 
 ```bash
 cd agent
@@ -26,10 +24,20 @@ pip install -r requirements.txt
 LAQTA_API_URL=http://localhost:8000 python -m laqta_agent.main
 ```
 
-`LAQTA_API_URL` defaults to `http://localhost:8000` if unset -- only
-relevant when running from source; see `laqta_agent/config.py` and
-"Building" below for why a *built* app doesn't read this env var in
-practice.
+That's the whole thing -- opens the same GUI a packaged `.app`/`.exe`
+would, against whatever `LAQTA_API_URL` points at (defaults to
+`http://localhost:8000`, this project's dev server, if unset). Nothing
+here needs PyInstaller; see "Building" further down only when you
+actually need a distributable `.app`/`.exe` for someone who isn't
+running from a checked-out copy of this repo.
+
+## Pairing (how a photographer connects it, in one sentence)
+
+An organizer clicks "Pair camera agent" on an event's dashboard card,
+gets a 6-character code good for 15 minutes, reads it to the
+photographer, who types it into this app once -- the app exchanges it
+for a long-lived token (`POST /api/agent/pair`) stored in the OS
+keychain, and never asks for anything else again.
 
 ## Tests
 
@@ -62,6 +70,25 @@ default in `laqta_agent/config.py` to the production API URL. The
 `LAQTA_API_URL` env var only affects running from source -- a photographer
 launching the built app has no env var set, so the packaged app always
 uses whatever's hardcoded in `config.py` at build time.
+
+A real macOS build was produced and verified this way (the app launches
+standalone, confirmed by hand) and is hosted at
+`web/public/downloads/LaqtaAgent-macOS.zip`, linked from `/help/camera`
+and the dashboard's pairing panel.
+
+**There is currently no real Windows `.exe`.** `build_windows.bat` mirrors
+`build_macos.sh` but was never run -- this development environment has
+no Windows machine, and PyInstaller cannot cross-compile one from macOS
+under any circumstances. `.github/workflows/build-agent.yml` is the
+actual mechanism to produce one (a `windows-latest` CI runner really can
+run `build_windows.bat`), triggered by pushing an `agent-v*` tag or
+manually -- but it has never executed, since this repo has no `git
+remote` configured yet. Once it's pushed somewhere and the workflow runs
+successfully, download its Windows artifact and commit it to
+`web/public/downloads/LaqtaAgent-windows.zip` (or wire the workflow to
+publish there directly) -- until then, the dashboard/help-page Windows
+download intentionally shows "not available yet" rather than a broken
+or fake link.
 
 ## How it works
 

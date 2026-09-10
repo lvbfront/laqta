@@ -18,10 +18,36 @@ export interface HelpQA {
 
 export interface HelpContent {
   pageTitle: string;
-  intro: {
+
+  // Both paths, presented as equally valid choices based on shooting
+  // style -- neither is the "main" one or a fallback for the other.
+  pathsOverview: {
     heading: string;
-    paragraphs: string[];
+    body: string;
+    agentTitle: string;
+    agentBody: string;
+    ftpTitle: string;
+    ftpBody: string;
   };
+
+  selector: {
+    heading: string;
+    placeholder: string;
+    noResults: string;
+    notListedLabel: string;
+    verdictFtpTitle: string;
+    verdictFtpBody: string;
+    verdictAgentTitle: string;
+    verdictAgentBody: string;
+    verdictNotListedBody: string;
+    firmwareNote: string;
+    changeCamera: string;
+  };
+
+  tabs: { agent: string; ftp: string };
+
+  // --- Agent path ---
+  agentIntro: { heading: string; paragraphs: string[] };
   diagram: {
     camera: string;
     usbCable: string;
@@ -40,6 +66,20 @@ export interface HelpContent {
   steps: HelpStep[];
   troubleshootingHeading: string;
   troubleshooting: HelpQA[];
+
+  // --- Camera FTP path ---
+  ftpIntro: { heading: string; paragraphs: string[] };
+  ftpStepsHeading: string;
+  ftpSteps: HelpStep[];
+  ftpTroubleshootingHeading: string;
+  ftpTroubleshooting: HelpQA[];
+
+  // --- Download ---
+  downloadHeading: string;
+  downloadMac: string;
+  downloadWindows: string;
+  downloadWindowsUnavailable: string;
+  downloadSource: string;
 }
 
 // Root official domains only -- not deep-linked support-article paths,
@@ -111,13 +151,43 @@ const VENDORS_EN: VendorInfo[] = [
 export const CONTENT: Record<"ar" | "en", HelpContent> = {
   ar: {
     pageTitle: "توصيل الكاميرا بلقطة",
-    intro: {
+
+    pathsOverview: {
+      heading: "طريقتان، وكلتاهما مدعومتان بالكامل",
+      body: "هناك طريقتان لرفع الصور إلى لقطة تلقائيًا أثناء الحدث. أيّهما تختار يعتمد فقط على أسلوب تصويرك، وليس على أن إحداهما «أفضل» من الأخرى:",
+      agentTitle: "وكيل لقطة (جهاز كمبيوتر)",
+      agentBody:
+        "مناسب لموقع تصوير ثابت — بوث تصوير فردي، جلسات صور بترتيب معيّن، أو أي إعداد لا يتحرك فيه المصوّر كثيرًا بعيدًا عن مكانه. يحتاج جهاز كمبيوتر محمول بجانب الكاميرا طوال الوقت.",
+      ftpTitle: "FTP الكاميرا (بلا كمبيوتر)",
+      ftpBody:
+        "مناسب لمصوّر يتنقل داخل القاعة أو الحدث. إذا كانت كاميرتك تدعم FTP المدمج، يمكنك التصوير من أي مكان دون حمل كمبيوتر محمول إطلاقًا، باستخدام نقطة اتصال جوال (5G) فقط.",
+    },
+
+    selector: {
+      heading: "لست متأكدًا أيّهما يناسبك؟ اختر كاميرتك",
+      placeholder: "اكتب اسم الشركة أو الطراز، مثل: Canon R5",
+      noResults: "لا توجد نتائج مطابقة",
+      notListedLabel: "لا أجد كاميرتي في القائمة",
+      verdictFtpTitle: "✅ كاميرتك تدعم FTP المدمج",
+      verdictFtpBody: "يمكنك التصوير من أي مكان في الحدث دون حمل كمبيوتر محمول، باستخدام نقطة اتصال جوال. اطّلع على طريقة FTP أدناه.",
+      verdictAgentTitle: "💻 كاميرتك تحتاج جهاز كمبيوتر قريب",
+      verdictAgentBody: "كاميرتك (حسب معلوماتنا) لا تملك FTP مدمجًا، لذا استخدم وكيل لقطة عبر جهاز كمبيوتر بجانب الكاميرا. اطّلع على طريقة الوكيل أدناه.",
+      verdictNotListedBody:
+        "لا مشكلة — طريقة وكيل لقطة تعمل مع أي كاميرا تقريبًا (طالما لديها برنامج تصوير مرتبط بالكمبيوتر من الشركة المصنّعة)، لذا هذا هو الخيار الآمن الافتراضي. إذا كنت تعرف أن كاميرتك تدعم FTP مدمجًا، يمكنك تجربة طريقة FTP مباشرة.",
+      firmwareNote:
+        "ملاحظة: بعض الشركات المصنّعة تضيف دعم FTP لكاميرات موجودة عبر تحديث البرامج الثابتة (firmware). إذا لم تجد كاميرتك في القائمة أو كانت مصنّفة «بلا FTP مدمج»، تحقّق من قائمة الشبكة/الاتصال في كاميرتك نفسها — فقد تجد خيار «نقل FTP» غير مذكور هنا بعد.",
+      changeCamera: "تغيير الكاميرا",
+    },
+
+    tabs: { agent: "وكيل لقطة (موقع ثابت)", ftp: "FTP الكاميرا (تنقّل)" },
+
+    agentIntro: {
       heading: "قبل أن تبدأ: هناك برنامجان، وأنت بحاجة لكليهما",
       paragraphs: [
-        "هذه هي الفكرة الوحيدة التي يجب أن تفهمها قبل كل شيء، لأن معظم المشاكل سببها الخلط بينهما:",
+        "هذه هي الفكرة الوحيدة التي يجب أن تفهمها قبل كل شيء في طريقة الوكيل، لأن معظم المشاكل سببها الخلط بينهما:",
         "١) برنامج كاميرتك (من Canon أو Nikon أو Sony أو Fujifilm) — وظيفته الوحيدة أن يحفظ كل صورة تلتقطها في مجلد على جهاز الكمبيوتر، لحظة التقاطها. هذا البرنامج لا علاقة له بلقطة إطلاقًا.",
         "٢) وكيل لقطة (Laqta Agent) — برنامجنا نحن، ووظيفته الوحيدة أن يراقب ذلك المجلد بالتحديد، وما إن تظهر فيه صورة جديدة حتى يرفعها تلقائيًا إلى لقطة خلال ثوانٍ.",
-        "وكيل لقطة لا يتحدث مع الكاميرا أبدًا، ولا يعرف حتى أن لديك كاميرا — كل ما يفعله هو مراقبة مجلد. لذلك أهم خطوة في هذا الدليل كله هي: تأكد أن البرنامجين يشيران إلى نفس المجلد بالضبط.",
+        "وكيل لقطة لا يتحدث مع الكاميرا أبدًا، ولا يعرف حتى أن لديك كاميرا — كل ما يفعله هو مراقبة مجلد. لذلك أهم خطوة في هذا القسم كله هي: تأكد أن البرنامجين يشيران إلى نفس المجلد بالضبط.",
       ],
     },
     diagram: {
@@ -136,7 +206,7 @@ export const CONTENT: Record<"ar" | "en", HelpContent> = {
     },
     eosWarning: {
       title: "ملاحظة مهمة لمستخدمي Canon",
-      body: 'ميزة "Connect to EOS Utility" التي تظهر في قائمة اتصال الكاميرا (اتصال Wi-Fi مباشر بين الكاميرا وبرنامج EOS Utility) شيء مختلف تمامًا عن "FTP الكاميرا" الذي قد تراه في قوائم بعض الكاميرات الاحترافية. هذا الدليل يتحدث فقط عن EOS Utility عبر كابل USB — وليس عن أي إعداد FTP في الكاميرا نفسها.',
+      body: 'ميزة "Connect to EOS Utility" التي تظهر في قائمة اتصال الكاميرا (اتصال Wi-Fi مباشر بين الكاميرا وبرنامج EOS Utility) شيء مختلف تمامًا عن "FTP الكاميرا" الذي قد تراه في قوائم بعض الكاميرات الاحترافية (انظر تبويب FTP أعلاه إن كنت تبحث عن ذلك). هذا القسم يتحدث فقط عن EOS Utility عبر كابل USB.',
     },
     vendorsHeading: "١. ثبّت برنامج كاميرتك",
     vendors: VENDORS_AR,
@@ -199,16 +269,120 @@ export const CONTENT: Record<"ar" | "en", HelpContent> = {
           'في أي وقت، اضغط زر «فحص المجلد وإعادة رفع الصور القديمة» في نافذة وكيل لقطة. هذا يعيد فحص المجلد بالكامل من جديد — مفيد بشكل خاص في نهاية الحدث للتأكد من عدم تفويت أي صورة، خصوصًا إذا كان الوكيل مغلقًا لفترة أثناء التصوير.',
       },
     ],
+
+    ftpIntro: {
+      heading: "طريقة FTP: التصوير بلا كمبيوتر محمول",
+      paragraphs: [
+        "إذا كانت كاميرتك تدعم FTP مدمجًا (تحقق أعلاه إن لم تكن متأكدًا)، يمكنها إرسال كل صورة مباشرة إلى لقطة بنفسها، فور التقاطها — دون حاجة لأي جهاز كمبيوتر أو برنامج وسيط. هذا يعني أنك تستطيع التنقل بحرية في أي مكان بالحدث، طالما لديك اتصال إنترنت (عادةً عبر نقطة اتصال جوال 5G).",
+        "كل حدث له بيانات دخول FTP خاصة به (خادم، منفذ، اسم مستخدم، كلمة مرور) يحصل عليها منظّم الحدث من لوحة التحكم بالضغط على زر «بيانات FTP» في بطاقة الحدث.",
+      ],
+    },
+    ftpStepsHeading: "خطوات إعداد FTP على الكاميرا",
+    ftpSteps: [
+      {
+        title: "احصل على بيانات FTP من منظّم الحدث",
+        body: "اطلب من منظّم الحدث الضغط على زر «بيانات FTP» في بطاقة الحدث بلوحة التحكم — سيحصل على: الخادم (Host)، المنفذ (Port)، اسم المستخدم، وكلمة المرور. كلمة المرور تظهر مرة واحدة فقط، فتأكد من نسخها بدقة.",
+      },
+      {
+        title: "افتح قائمة الشبكة/FTP في كاميرتك",
+        body: "في قائمة إعدادات كاميرتك، ابحث عن قسم باسم «الشبكة» (Network) أو «الاتصال» (Connection)، ثم عن خيار «إعدادات نقل FTP» (FTP Transfer Settings). يختلف الاسم والمكان قليلًا حسب الشركة المصنّعة — راجع دليل كاميرتك إن لم تجده.",
+      },
+      {
+        title: "أدخل الخادم والمنفذ",
+        body: "أدخل قيمتي الخادم (Host) والمنفذ (Port) كما وردتا من المنظّم، بالضبط دون أي تعديل أو مسافات إضافية.",
+      },
+      {
+        title: "فعّل FTPS (وليس FTP العادي)",
+        body: "اختر وضع الاتصال «FTPS» أو «FTP over TLS» أو «Explicit FTPS» — وليس «FTP» العادي غير المشفّر. إذا ظهرت رسالة تحذير حول شهادة أمان غير موثوقة، هذا متوقع (نستخدم شهادة تطوير محلية)؛ اختر المتابعة/القبول.",
+      },
+      {
+        title: "أدخل اسم المستخدم وكلمة المرور",
+        body: "أدخلهما بدقة تامة (حساسان لحالة الأحرف). احفظ إعداد الاتصال.",
+      },
+      {
+        title: "اختبر الاتصال إن توفر خيار لذلك",
+        body: "بعض الكاميرات توفر زر «اختبار الاتصال» (Connection Test) ضمن إعدادات FTP — استخدمه للتأكد قبل بدء التصوير الفعلي.",
+      },
+      {
+        title: "التقط صورة تجريبية وتأكد من الرفع",
+        body: "التقط صورة، وراقب مؤشر النقل على شاشة الكاميرا (عادة رمز أو رسالة صغيرة تشير لنجاح الإرسال). إذا نجح، افتح لوحة تحكم لقطة وتأكد من ظهور الصورة في قائمة صور الحدث.",
+      },
+    ],
+    ftpTroubleshootingHeading: "المشاكل الشائعة في FTP وحلولها",
+    ftpTroubleshooting: [
+      {
+        question: "الكاميرا تقول «فشل الاتصال» (Connection Failed)",
+        answer:
+          "تحقق أولاً من أن الكاميرا متصلة فعليًا بالإنترنت (إشارة نقطة الاتصال الجوال قوية، وليست مجرد مفعّلة). ثم تأكد من: الخادم والمنفذ مُدخلان بالضبط دون أخطاء إملائية، ووضع الاتصال مضبوط على FTPS وليس FTP العادي.",
+      },
+      {
+        question: "الاتصال ينجح لكن نقل الصور يفشل أو يتوقف (Timeout)",
+        answer:
+          "غالبًا سبب ذلك إعداد «الوضع السلبي» (Passive Mode) — تأكد من تفعيله إن وُجد كخيار منفصل في قائمة FTP بالكاميرا. إذا استمرت المشكلة، تواصل مع منظّم الحدث للتأكد من أن الشبكة التي يعمل عليها الخادم تسمح بنطاق منافذ النقل السلبي.",
+      },
+      {
+        question: "الكاميرا تقول أن الصورة أُرسلت، لكنها لا تظهر في لقطة",
+        answer:
+          "تحقق من منظّم الحدث أن الحدث لا يزال نشطًا وأن بيانات FTP لم تُلغَ. إن كان الحدث من نوع «صارم»، فالصور لا تظهر لأحد قبل موافقة أحد المشرفين عليها من صفحة المراجعة — هذا سلوك متوقع وليس خطأ.",
+      },
+      {
+        question: "بيانات الدخول توقفت عن العمل أثناء الحدث",
+        answer:
+          "يمكن لمنظّم الحدث إلغاء بيانات دخول أي وقت من لوحة التحكم (مثلاً عند فقدان جهاز). اطلب منه إصدار بيانات دخول جديدة من نفس بطاقة الحدث — يمكن إصدار أكثر من مجموعة بيانات لنفس الحدث.",
+      },
+      {
+        question: "هل يمكن أن تفقد الاتصال أثناء التنقل داخل القاعة؟",
+        answer:
+          "نعم، وهذا الفرق الأساسي بين هذه الطريقة وطريقة الوكيل: الاعتماد على نقطة اتصال جوال يعني أن قوة الإشارة قد تختلف من مكان لآخر بالقاعة. هذا ليس عطلاً — إذا انقطع الاتصال مؤقتًا، أعد المحاولة بعد التأكد من عودة الإشارة. لموقع تصوير ثابت لا يتحرك، يوفّر الوكيل عبر جهاز كمبيوتر اتصالًا أكثر استقرارًا عادةً.",
+      },
+    ],
+
+    downloadHeading: "تنزيل وكيل لقطة",
+    downloadMac: "تنزيل لـ macOS",
+    downloadWindows: "تنزيل لـ Windows",
+    downloadWindowsUnavailable: "نسخة Windows الجاهزة للتنزيل غير متوفرة بعد — راجع ملف agent/README.md للتشغيل من الكود المصدري في هذه الأثناء.",
+    downloadSource: "أو شغّله من الكود المصدري (للمطوّرين) — راجع agent/README.md",
   },
+
   en: {
     pageTitle: "Connecting your camera to Laqta",
-    intro: {
+
+    pathsOverview: {
+      heading: "Two ways, both fully supported",
+      body: "There are two ways to get photos into Laqta automatically during your event. Which one to use depends only on how you shoot, not on one being \"better\" than the other:",
+      agentTitle: "Laqta Agent (a computer)",
+      agentBody:
+        "Best for a stationary shooting setup — a solo photo booth, seated portraits taken in sequence, or any setup where the photographer doesn't move far from their spot. Needs a laptop next to the camera the whole time.",
+      ftpTitle: "Camera FTP (no computer)",
+      ftpBody:
+        "Best for a photographer moving around the venue. If your camera has built-in FTP, you can shoot from anywhere without carrying a laptop at all, using only a mobile hotspot (5G).",
+    },
+
+    selector: {
+      heading: "Not sure which fits you? Pick your camera",
+      placeholder: "Type your brand or model, e.g. Canon R5",
+      noResults: "No matching cameras",
+      notListedLabel: "I don't see my camera",
+      verdictFtpTitle: "✅ Your camera has built-in FTP",
+      verdictFtpBody: "You can shoot from anywhere at the event without a laptop, using a mobile hotspot. See the FTP path below.",
+      verdictAgentTitle: "💻 Your camera needs a nearby computer",
+      verdictAgentBody: "As far as we know, your camera doesn't have built-in FTP, so use Laqta Agent with a laptop next to the camera. See the agent path below.",
+      verdictNotListedBody:
+        "No problem -- the Laqta Agent path works with almost any camera (as long as it has a manufacturer tethering program), so it's the safe default. If you know your camera has built-in FTP, you can try the FTP path directly instead.",
+      firmwareNote:
+        "Note: some manufacturers add FTP support to existing cameras via a firmware update. If you don't see your camera listed, or it's marked as no built-in FTP, check your camera's own network/connection menu -- it may have an \"FTP transfer\" option not reflected here yet.",
+      changeCamera: "Change camera",
+    },
+
+    tabs: { agent: "Laqta Agent (stationary)", ftp: "Camera FTP (mobile)" },
+
+    agentIntro: {
       heading: "Before you start: there are two separate pieces of software, and you need both",
       paragraphs: [
-        "This is the single most important thing to understand first, because almost every problem people run into comes from mixing these two up:",
+        "This is the single most important thing to understand first for the agent path, because almost every problem people run into comes from mixing these two up:",
         "1) Your camera's tethering software (from Canon, Nikon, Sony, or Fujifilm) — its only job is to save every photo you take into a folder on your computer, the instant you take it. This software has nothing to do with Laqta.",
         "2) Laqta Agent — our software. Its only job is to watch that exact folder, and the moment a new photo appears in it, upload it to Laqta automatically within seconds.",
-        "Laqta Agent never talks to your camera at all — it doesn't even know you have one. All it does is watch a folder. So the single most important step in this whole guide is: make sure both programs are pointed at the exact same folder.",
+        "Laqta Agent never talks to your camera at all — it doesn't even know you have one. All it does is watch a folder. So the single most important step in this whole section is: make sure both programs are pointed at the exact same folder.",
       ],
     },
     diagram: {
@@ -227,7 +401,7 @@ export const CONTENT: Record<"ar" | "en", HelpContent> = {
     },
     eosWarning: {
       title: "Important note for Canon users",
-      body: 'The "Connect to EOS Utility" feature in your camera\'s connection menu (a direct Wi-Fi link between the camera and the EOS Utility software) is completely different from "camera FTP", which some professional camera bodies also offer. This guide only covers EOS Utility over a USB cable -- not any FTP setting on the camera itself.',
+      body: 'The "Connect to EOS Utility" feature in your camera\'s connection menu (a direct Wi-Fi link between the camera and the EOS Utility software) is completely different from "camera FTP", which some professional camera bodies also offer (see the FTP tab above if that\'s what you\'re looking for). This section only covers EOS Utility over a USB cable.',
     },
     vendorsHeading: "1. Install your camera's software",
     vendors: VENDORS_EN,
@@ -290,5 +464,78 @@ export const CONTENT: Record<"ar" | "en", HelpContent> = {
           'At any time, click "Scan folder and upload older photos" in the Laqta Agent window. This re-scans the whole folder from scratch -- especially useful at the end of the event to make sure nothing was missed, particularly if the agent was closed for a while during shooting.',
       },
     ],
+
+    ftpIntro: {
+      heading: "The FTP path: shoot with no laptop",
+      paragraphs: [
+        "If your camera has built-in FTP (check above if you're not sure), it can send every photo straight to Laqta by itself, the instant it's taken -- no computer or middleman software needed. That means you're free to move around anywhere at the event, as long as you have internet access (usually via a mobile 5G hotspot).",
+        'Each event has its own FTP credentials (host, port, username, password) that the event organizer gets from the dashboard by clicking "FTP credentials" on the event card.',
+      ],
+    },
+    ftpStepsHeading: "Setting up FTP on your camera",
+    ftpSteps: [
+      {
+        title: "Get FTP credentials from the event organizer",
+        body: 'Ask the organizer to click "FTP credentials" on the event card in the dashboard -- they\'ll get a host, port, username, and password. The password is shown only once, so make sure it\'s copied accurately.',
+      },
+      {
+        title: "Open the network/FTP menu on your camera",
+        body: 'In your camera\'s settings menu, look for a "Network" or "Connection" section, then an "FTP Transfer Settings" option. The exact name and location varies by manufacturer -- check your camera\'s manual if you can\'t find it.',
+      },
+      {
+        title: "Enter the host and port",
+        body: "Enter the host and port exactly as given by the organizer, with no extra spaces or typos.",
+      },
+      {
+        title: "Turn on FTPS (not plain FTP)",
+        body: 'Choose "FTPS", "FTP over TLS", or "Explicit FTPS" as the connection mode -- not plain, unencrypted "FTP". If you see a warning about an untrusted security certificate, that\'s expected (we use a local development certificate); choose to continue/accept.',
+      },
+      {
+        title: "Enter the username and password",
+        body: "Enter them exactly (they're case-sensitive). Save the connection settings.",
+      },
+      {
+        title: "Test the connection if your camera offers it",
+        body: 'Some cameras have a "Connection Test" option within the FTP settings -- use it to confirm everything works before you start shooting for real.',
+      },
+      {
+        title: "Take a test shot and confirm the upload",
+        body: "Take a photo and watch the transfer indicator on your camera's screen (usually a small icon or message confirming a successful send). If it succeeds, open the Laqta dashboard and confirm the photo appears in that event's photo list.",
+      },
+    ],
+    ftpTroubleshootingHeading: "Common FTP problems and fixes",
+    ftpTroubleshooting: [
+      {
+        question: '"Connection Failed" on the camera',
+        answer:
+          "First confirm the camera actually has internet access (the hotspot has real signal, not just power). Then check: the host and port are entered exactly right, with no typos, and the connection mode is set to FTPS, not plain FTP.",
+      },
+      {
+        question: "Connection succeeds but the transfer fails or times out",
+        answer:
+          'This is usually a "Passive Mode" setting -- make sure it\'s turned on if your camera\'s FTP menu offers it as a separate option. If the problem continues, check with the event organizer that the network the server runs on allows the passive transfer port range through.',
+      },
+      {
+        question: "The camera says the photo sent, but it doesn't show up in Laqta",
+        answer:
+          "Check with the organizer that the event is still active and the FTP credentials weren't revoked. If it's a \"strict\" privacy event, photos don't show up for anyone until a moderator approves them on the review page -- that's expected behavior, not a bug.",
+      },
+      {
+        question: "The credentials stopped working mid-event",
+        answer:
+          "An organizer can revoke credentials at any time from the dashboard (e.g. if a device was lost). Ask them to issue a fresh set from the same event card -- more than one credential set can exist for the same event at once.",
+      },
+      {
+        question: "Can the connection drop while I'm moving around the venue?",
+        answer:
+          "Yes -- and this is the core tradeoff versus the agent path: relying on a mobile hotspot means signal strength can vary from spot to spot in the venue. That's not a malfunction -- if the connection drops briefly, just retry once signal is back. For a fixed shooting spot that doesn't move, the agent over a laptop usually gives a more consistently stable connection.",
+      },
+    ],
+
+    downloadHeading: "Download Laqta Agent",
+    downloadMac: "Download for macOS",
+    downloadWindows: "Download for Windows",
+    downloadWindowsUnavailable: "A ready-to-run Windows build isn't available yet -- see agent/README.md to run it from source in the meantime.",
+    downloadSource: "Or run it from source (for developers) -- see agent/README.md",
   },
 };

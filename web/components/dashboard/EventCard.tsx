@@ -149,18 +149,9 @@ export function EventCard({ event }: { event: EventDetail }) {
         <div className="mt-4 flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={handleIssuePairingCode}
-            disabled={issuingPairingCode}
-            className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-          >
-            {issuingPairingCode ? t("dashboard.events.pair_agent_generating") : t("dashboard.events.pair_agent")}
-          </button>
-
-          <button
-            type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 disabled:opacity-60"
+            className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
             {uploading ? t("dashboard.events.uploading") : t("dashboard.events.upload")}
           </button>
@@ -172,6 +163,20 @@ export function EventCard({ event }: { event: EventDetail }) {
           >
             {t("dashboard.events.moderate_link")}
           </Link>
+
+          {/* Agent pairing and FTP credentials given equal visual weight
+              on purpose -- both are fully supported ingest paths (agent
+              for a stationary/booth setup, FTP for a photographer moving
+              around the venue), not a primary path and a legacy
+              fallback. See web/app/help/camera for the full explanation. */}
+          <button
+            type="button"
+            onClick={handleIssuePairingCode}
+            disabled={issuingPairingCode}
+            className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 disabled:opacity-60"
+          >
+            {issuingPairingCode ? t("dashboard.events.pair_agent_generating") : t("dashboard.events.pair_agent")}
+          </button>
 
           <button
             type="button"
@@ -194,6 +199,20 @@ export function EventCard({ event }: { event: EventDetail }) {
               {t("dashboard.events.pair_agent_expires")}{" "}
               {new Date(pairingCode.expires_at).toLocaleTimeString(locale === "ar" ? "ar-SA" : "en-US")}
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <a
+                href="/downloads/LaqtaAgent-macOS.zip"
+                className="rounded-full bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white"
+              >
+                {t("dashboard.events.download_mac")}
+              </a>
+              <span
+                className="text-xs text-neutral-400 cursor-not-allowed"
+                title={t("dashboard.events.download_windows_unavailable")}
+              >
+                {t("dashboard.events.download_windows_unavailable")}
+              </span>
+            </div>
             <Link href="/help/camera" target="_blank" className="mt-2 block text-xs font-medium text-neutral-600 underline">
               {locale === "ar" ? "دليل توصيل الكاميرا خطوة بخطوة" : "Step-by-step camera setup guide"}
             </Link>
@@ -220,6 +239,9 @@ export function EventCard({ event }: { event: EventDetail }) {
               <dt className="text-neutral-500">{t("dashboard.events.ftp_password")}</dt>
               <dd className="font-mono">{ftpCredential.password}</dd>
             </dl>
+            <Link href="/help/camera" target="_blank" className="mt-2 block text-xs font-medium text-amber-800 underline">
+              {locale === "ar" ? "دليل توصيل الكاميرا خطوة بخطوة" : "Step-by-step camera setup guide"}
+            </Link>
             <button
               type="button"
               onClick={() => setFtpCredential(null)}

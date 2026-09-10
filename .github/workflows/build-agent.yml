@@ -1,0 +1,75 @@
+# Builds the desktop agent for both platforms. PyInstaller doesn't
+# cross-compile -- a Windows .exe genuinely cannot be produced on the Mac
+# this repo was otherwise developed on, only on a real Windows machine or
+# (as here) a windows-latest CI runner. This workflow is that mechanism.
+#
+# Triggers on a version tag (agent-v*) or manually. Uploads both builds
+# as workflow artifacts; on a tag push, also attaches them to a GitHub
+# Release. To publish a new agent build:
+#   git tag agent-v0.1.0 && git push origin agent-v0.1.0
+#
+# The zips this produces are meant to replace web/public/downloads/
+# LaqtaAgent-macOS.zip (and add the Windows one) -- download that
+# artifact/release asset and commit it there, or wire this workflow to
+# do that automatically once this repo has a real deployment target.
+name: Build agent
+
+on:
+  push:
+    tags:
+      - "agent-v*"
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            script: ./build_macos.sh
+            artifact_name: LaqtaAgent-macOS
+            app_glob: "dist/Laqta Agent.app"
+          - os: windows-latest
+            script: build_windows.bat
+            artifact_name: LaqtaAgent-windows
+            app_glob: "dist/Laqta Agent.exe"
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          chmod +x build_macos.sh
+          ./build_macos.sh
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: build_windows.bat
+        shell: cmd
+
+      - name: Zip macOS app
+        if: runner.os == 'macOS'
+        run: ditto -c -k --sequesterRsrc --keepParent "dist/Laqta Agent.app" "${{ matrix.artifact_name }}.zip"
+
+      - name: Zip Windows exe
+        if: runner.os == 'Windows'
+        run: powershell Compress-Archive -Path "dist/Laqta Agent.exe" -DestinationPath "${{ matrix.artifact_name }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: agent/${{ matrix.artifact_name }}.zip
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/agent-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: agent/${{ matrix.artifact_name }}.zip

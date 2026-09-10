@@ -110,6 +110,8 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     "dashboard.events.pair_agent_expires": "صالح حتى",
     "dashboard.events.pair_agent_instructions": "افتح تطبيق وكيل لقطة على جهاز المصوّر وأدخل هذا الرمز.",
     "dashboard.events.pair_agent_close": "إغلاق",
+    "dashboard.events.download_mac": "تنزيل الوكيل لـ macOS",
+    "dashboard.events.download_windows_unavailable": "نسخة Windows غير متوفرة بعد",
 
     "dashboard.moderate.codes_label": "رموز الشارة/السوار",
     "dashboard.moderate.codes_placeholder": "أدخل رمزًا",
@@ -234,6 +236,8 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     "dashboard.events.pair_agent_expires": "Valid until",
     "dashboard.events.pair_agent_instructions": "Open the Laqta Agent app on the photographer's laptop and enter this code.",
     "dashboard.events.pair_agent_close": "Close",
+    "dashboard.events.download_mac": "Download agent for macOS",
+    "dashboard.events.download_windows_unavailable": "Windows build not available yet",
 
     "dashboard.moderate.codes_label": "Bib/badge codes",
     "dashboard.moderate.codes_placeholder": "Enter a code",
