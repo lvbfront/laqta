@@ -221,6 +221,23 @@ docker compose up -d api
 curl http://localhost:8000/health   # {"status": "ok"}
 ```
 
+**`api` hot-reloads on code changes (`uvicorn --reload`); `worker` and
+`ftps` do not.** Both are long-running processes that import
+`app.services.ingest`/`app.workers.jobs` once at startup and keep that
+in memory for the life of the container -- a bind-mounted file change on
+disk doesn't touch what's already imported. Caught by hand: a
+match_mode='sequential' fix landed in the code, worked in every test and
+in the dashboard (which only ever goes through `api`), but silently
+didn't apply to a real FTPS upload until `docker compose restart worker
+ftps` -- the running `ftps` container was still executing the ingest
+logic from before that change. After editing anything under
+`app/services/ingest.py`, `app/workers/`, or `app/ftps/`, restart those
+two explicitly:
+
+```bash
+docker compose restart worker ftps
+```
+
 Run the frontend (natively on the host, not in Docker — see CLAUDE.md):
 
 ```bash
