@@ -6,7 +6,12 @@ from pathlib import Path
 
 import requests
 
-from laqta_agent.config import API_BASE_URL, PAIR_HTTP_TIMEOUT_SECONDS, UPLOAD_HTTP_TIMEOUT_SECONDS
+from laqta_agent.config import (
+    API_BASE_URL,
+    HEALTH_CHECK_TIMEOUT_SECONDS,
+    PAIR_HTTP_TIMEOUT_SECONDS,
+    UPLOAD_HTTP_TIMEOUT_SECONDS,
+)
 
 
 class PairingError(Exception):
@@ -69,6 +74,26 @@ class ApiClient:
 
         body = resp.json()
         return body["token"], body["event_id"]
+
+    def check_connectivity(self) -> bool:
+        """Hits the API's plain /health endpoint -- deliberately not an
+        authenticated call, since the point is to answer "does this
+        machine have a working route to the internet at all", not
+        anything about the stored token. Used by Uploader to detect the
+        no-internet case (the camera's own Wi-Fi access-point mode is the
+        single most common cause -- the laptop joins the camera's
+        isolated network and loses its real internet route entirely)
+        *proactively*, not only after a real upload attempt happens to
+        fail -- with an empty queue there may be no upload attempt for a
+        long time, and the wrong state would otherwise sit on screen
+        silently. Returns False for literally any failure -- DNS, refused,
+        timeout, a non-2xx status -- the caller only needs yes/no.
+        """
+        try:
+            resp = requests.get(f"{self.base_url}/health", timeout=HEALTH_CHECK_TIMEOUT_SECONDS)
+        except requests.exceptions.RequestException:
+            return False
+        return resp.ok
 
     def upload_photo(self, token: str, path: Path) -> UploadOutcome:
         content_type = mimetypes.guess_type(path.name)[0] or "image/jpeg"

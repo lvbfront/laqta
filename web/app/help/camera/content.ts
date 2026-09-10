@@ -16,6 +16,11 @@ export interface HelpQA {
   answer: string;
 }
 
+export interface WirelessTip {
+  title: string;
+  body: string;
+}
+
 export interface HelpContent {
   pageTitle: string;
 
@@ -60,6 +65,16 @@ export interface HelpContent {
   };
   usbNote: { title: string; body: string };
   eosWarning: { title: string; body: string };
+  wireless: {
+    heading: string;
+    apWarningTitle: string;
+    apWarningBody: string;
+    correctSetupTitle: string;
+    correctSetupBody: string;
+    tips: WirelessTip[];
+    coverageTestTitle: string;
+    coverageTestBody: string;
+  };
   vendorsHeading: string;
   vendors: VendorInfo[];
   stepsHeading: string;
@@ -207,6 +222,40 @@ export const CONTENT: Record<"ar" | "en", HelpContent> = {
     eosWarning: {
       title: "ملاحظة مهمة لمستخدمي Canon",
       body: 'ميزة "Connect to EOS Utility" التي تظهر في قائمة اتصال الكاميرا (اتصال Wi-Fi مباشر بين الكاميرا وبرنامج EOS Utility) شيء مختلف تمامًا عن "FTP الكاميرا" الذي قد تراه في قوائم بعض الكاميرات الاحترافية (انظر تبويب FTP أعلاه إن كنت تبحث عن ذلك). هذا القسم يتحدث فقط عن EOS Utility عبر كابل USB.',
+    },
+    wireless: {
+      heading: "الاتصال اللاسلكي (بديل عن كابل USB)",
+      apWarningTitle: "⚠️ تحذير مهم: لا تستخدم نقطة اتصال الكاميرا نفسها (وضع Access Point)",
+      apWarningBody:
+        'كثير من الكاميرات توفّر وضعًا تُنشئ فيه شبكة Wi-Fi خاصة بها (Access Point) لتتصل بها مباشرة من جهاز آخر. لا تستخدم هذا الوضع مع وكيل لقطة: إذا انضم الكمبيوتر إلى شبكة الكاميرا هذه، فلن يعود لديه أي اتصال بالإنترنت على الإطلاق — لأن شبكة الكاميرا معزولة تمامًا عن الإنترنت. سيستمر وكيل لقطة في رصد الصور الجديدة وإضافتها لقائمة الانتظار، لكنه لن يتمكن من رفع أي منها أبدًا، وقد لا تلاحظ المشكلة فورًا إن لم تراقب الشاشة. هذا هو الخطأ الأكثر شيوعًا في الاتصال اللاسلكي، وتحديدًا ما يظهر له وكيل لقطة الآن تحذيرًا واضحًا على الشاشة (انظر أدناه).',
+      correctSetupTitle: "الإعداد الصحيح",
+      correctSetupBody:
+        "يجب أن تنضم الكاميرا والكمبيوتر كلاهما إلى نفس نقطة اتصال خارجية — نقطة اتصال جوال (هاتف) أو راوتر سفر (travel router) — وليس أن ينضم أحدهما إلى الآخر مباشرة. بهذه الطريقة يحصل الكمبيوتر على اتصال إنترنت حقيقي، بينما يبقى قادرًا على التواصل مع الكاميرا عبر نفس الشبكة المحلية.",
+      tips: [
+        {
+          title: "ضع نقطة الاتصال في مكان مركزي ومرتفع",
+          body: "كلما كانت نقطة الاتصال أقرب لمنتصف القاعة وأعلى ارتفاعًا (على طاولة أو رف، لا على الأرض)، كانت التغطية أفضل وأكثر تجانسًا في كل الاتجاهات.",
+        },
+        {
+          title: "توقّع نطاق تغطية ١٠-٢٠ مترًا داخل المبنى",
+          body: "هذا نطاق واقعي للاتصال اللاسلكي داخل قاعة عادية، ويتأثر بالجدران والحشود والتداخل مع شبكات أخرى. لا تفترض تغطية كاملة للقاعة دون اختبار فعلي (انظر اختبار التغطية أدناه).",
+        },
+        {
+          title: "صوّر بحجم JPEG صغير أو متوسط فقط",
+          body: "الملفات الكبيرة (JPEG بأقصى دقة، أو RAW) تستغرق وقتًا أطول بكثير للنقل لاسلكيًا مقارنة بكابل USB، مما قد يسبب تراكمًا في قائمة الانتظار. اضبط حجم الصورة في الكاميرا على صغير أو متوسط عند التصوير اللاسلكي.",
+        },
+        {
+          title: "عطّل إيقاف التشغيل التلقائي للكاميرا",
+          body: "معظم الكاميرات تدخل في وضع سكون أو تُغلق تلقائيًا بعد بضع دقائق من عدم الاستخدام، مما يقطع الاتصال اللاسلكي ويتطلب إعادة الاتصال يدويًا. عطّل هذا الإعداد (أو اضبطه على أطول مدة ممكنة) من قائمة إعدادات الطاقة في الكاميرا طوال فترة الحدث.",
+        },
+        {
+          title: "أحضر بطاريات احتياطية",
+          body: "يستهلك الاتصال اللاسلكي طاقة البطارية بشكل أسرع بكثير من التصوير العادي أو التوصيل بكابل USB (الذي يشحن الكاميرا أثناء الاستخدام في كثير من الأجسام). لا تعتمد على بطارية واحدة ليوم كامل من التصوير اللاسلكي.",
+        },
+      ],
+      coverageTestTitle: "اختبار التغطية قبل الحدث",
+      coverageTestBody:
+        "لا تكتشف حدود التغطية اللاسلكية لأول مرة أثناء الحدث نفسه. قبل يوم الحدث بوقت كافٍ، اذهب إلى موقع التصوير وامشِ في كل أنحاء القاعة، والتقط صورة تجريبية كل بضعة أمتار أثناء تحركك، وراقب عداد «تم الرفع» في نافذة وكيل لقطة على الكمبيوتر (اطلب من شخص آخر مراقبته إن كنت تتحرك بالكاميرا بعيدًا عن الجهاز). علّم أي منطقة يتوقف فيها العداد عن الزيادة — هذه هي الحدود الفعلية لتغطيتك، ومن الأفضل معرفتها الآن والتخطيط حولها (نقل نقطة الاتصال، أو تجنّب التصوير من تلك الزاوية) بدلاً من اكتشافها فجأة أثناء الحدث.",
     },
     vendorsHeading: "١. ثبّت برنامج كاميرتك",
     vendors: VENDORS_AR,
@@ -402,6 +451,40 @@ export const CONTENT: Record<"ar" | "en", HelpContent> = {
     eosWarning: {
       title: "Important note for Canon users",
       body: 'The "Connect to EOS Utility" feature in your camera\'s connection menu (a direct Wi-Fi link between the camera and the EOS Utility software) is completely different from "camera FTP", which some professional camera bodies also offer (see the FTP tab above if that\'s what you\'re looking for). This section only covers EOS Utility over a USB cable.',
+    },
+    wireless: {
+      heading: "Wireless tethering (an alternative to USB)",
+      apWarningTitle: "⚠️ Important warning: do NOT use the camera's own access point mode",
+      apWarningBody:
+        "Many cameras offer a mode where the camera creates its own Wi-Fi network (Access Point mode) that another device connects to directly. Don't use this mode with Laqta Agent: if the computer joins the camera's own network, it loses its internet connection entirely -- the camera's network is completely isolated from the internet. Laqta Agent will keep detecting new photos and queuing them, but it will never be able to upload any of them, and you may not notice right away if you're not watching the screen. This is the single most common wireless-tethering mistake, and it's exactly what Laqta Agent's offline warning banner now exists to catch immediately (see below).",
+      correctSetupTitle: "The correct setup",
+      correctSetupBody:
+        "Both the camera and the computer must join the same external hotspot -- a mobile phone hotspot or a travel router -- not join each other directly. This way the computer gets a real internet connection, while still being able to reach the camera over the same local network.",
+      tips: [
+        {
+          title: "Place the hotspot centrally and elevated",
+          body: "The closer the hotspot is to the center of the venue, and the higher it's placed (on a table or shelf, not the floor), the more even and reliable the coverage in every direction.",
+        },
+        {
+          title: "Expect 10-20m of indoor range",
+          body: "That's a realistic range for wireless tethering inside an ordinary venue, affected by walls, crowds, and interference from other networks. Don't assume full-venue coverage without actually testing it (see the coverage test below).",
+        },
+        {
+          title: "Shoot small or medium JPEG only",
+          body: "Large files (full-resolution JPEG, or RAW) take much longer to transfer wirelessly than over USB, which can cause the upload queue to back up. Set the camera's image size to small or medium specifically for wireless shooting.",
+        },
+        {
+          title: "Disable the camera's auto power-off",
+          body: "Most cameras sleep or power off automatically after a few minutes of inactivity, which drops the wireless connection and requires manually reconnecting. Turn this off (or set it to the longest available duration) in the camera's power settings for the whole event.",
+        },
+        {
+          title: "Bring spare batteries",
+          body: "Wireless tethering drains the battery much faster than normal shooting or a USB connection (which charges the camera during use on many bodies). Don't rely on a single battery for a full day of wireless shooting.",
+        },
+      ],
+      coverageTestTitle: "Test coverage before the event",
+      coverageTestBody:
+        "Don't discover the limits of your wireless coverage for the first time during the actual event. With enough time before the event, go to the venue and walk through the whole space, taking a test shot every few metres as you go, while watching the \"Uploaded\" counter in the Laqta Agent window on the computer (ask someone else to watch it if you're moving away from the machine with the camera). Mark any area where the counter stops increasing -- that's your actual coverage boundary, and it's much better to know it now and plan around it (move the hotspot, or avoid shooting from that spot) than to discover it suddenly during the event.",
     },
     vendorsHeading: "1. Install your camera's software",
     vendors: VENDORS_EN,

@@ -128,6 +128,38 @@ export default function CameraHelpPage() {
               </div>
             </div>
 
+            <Section title={content.wireless.heading}>
+              {/* Leads with the critical warning, per how this section was
+                  written -- red, not amber, and first, because this exact
+                  mistake (joining the camera's own AP instead of a shared
+                  hotspot) is what silently kills uploads with no obvious
+                  symptom other than the agent's offline banner (see
+                  agent/laqta_agent/gui.py). */}
+              <div className="rounded-2xl border-2 border-red-600 bg-red-50 p-4">
+                <h3 className="font-bold text-red-900">{content.wireless.apWarningTitle}</h3>
+                <p className="text-sm text-red-800 leading-relaxed mt-1">{content.wireless.apWarningBody}</p>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-4">
+                <h3 className="font-semibold mb-1">{content.wireless.correctSetupTitle}</h3>
+                <p className="text-sm text-neutral-600 leading-relaxed">{content.wireless.correctSetupBody}</p>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {content.wireless.tips.map((tip, i) => (
+                  <div key={i} className="rounded-2xl border border-neutral-200 bg-white p-4">
+                    <p className="font-medium">{tip.title}</p>
+                    <p className="text-sm text-neutral-600 mt-1 leading-relaxed">{tip.body}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 rounded-2xl border-2 border-neutral-900 bg-white p-4">
+                <h3 className="font-bold">{content.wireless.coverageTestTitle}</h3>
+                <p className="text-sm text-neutral-700 leading-relaxed mt-1">{content.wireless.coverageTestBody}</p>
+              </div>
+            </Section>
+
             <Section title={content.vendorsHeading}>
               <div className="grid gap-3 sm:grid-cols-2">
                 {content.vendors.map((v) => (

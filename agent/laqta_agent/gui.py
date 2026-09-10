@@ -143,7 +143,27 @@ class AgentApp:
     def _build_status_frame(self) -> None:
         f = self.status_frame
 
+        # Not packed here -- shown/hidden by _refresh_status(), always
+        # anchored back to this exact position (before=self._top_frame)
+        # so it can't drift to the bottom after a hide/show cycle. This
+        # is deliberately louder than connection_label below: the point
+        # (per direct product feedback) is that a photographer glancing
+        # at the screen must not be able to miss "nothing is uploading
+        # right now", not just have it technically visible somewhere.
+        self.offline_banner = tk.Label(
+            f,
+            text="",
+            font=("", 11, "bold"),
+            bg="#b91c1c",
+            fg="white",
+            wraplength=420,
+            justify="center",
+            padx=8,
+            pady=10,
+        )
+
         top = ttk.Frame(f)
+        self._top_frame = top
         top.pack(fill="x")
         self.connection_label = ttk.Label(top, text="", font=("", 13, "bold"))
         self.connection_label.pack(side="left")
@@ -201,6 +221,11 @@ class AgentApp:
             text=t(self.locale, "status.connected" if online else "status.offline"),
             foreground="#1a7f37" if online else "#b45309",
         )
+        if online:
+            self.offline_banner.pack_forget()
+        else:
+            self.offline_banner.configure(text=t(self.locale, "status.offline_banner"))
+            self.offline_banner.pack(fill="x", pady=(0, 10), before=self._top_frame)
         self.folder_label.configure(
             text=f"{t(self.locale, 'status.folder_label')}: {self.settings.folder or '-'}"
         )

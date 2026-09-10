@@ -36,6 +36,17 @@ IGNORED_SUFFIXES = {".tmp", ".xmp", ".part", ".crdownload"}
 RETRY_BASE_DELAY_SECONDS = 2.0
 RETRY_MAX_DELAY_SECONDS = 300.0
 
+# How often Uploader checks connectivity while idle (no files waiting) --
+# this is what catches "no internet at all" (the camera's own Wi-Fi
+# access-point mode is the single most common cause, see
+# web/app/help/camera's wireless section) quickly even when nothing has
+# been shot yet to trigger a real upload attempt that would fail on its
+# own. Short on purpose: this is a cheap GET, and the whole point is
+# surfacing a real connectivity problem within a few seconds, not
+# minutes.
+HEALTH_CHECK_INTERVAL_SECONDS = 5.0
+HEALTH_CHECK_TIMEOUT_SECONDS = 3
+
 UPLOAD_HTTP_TIMEOUT_SECONDS = 60
 PAIR_HTTP_TIMEOUT_SECONDS = 15
 
