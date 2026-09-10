@@ -194,6 +194,9 @@ export function EventCard({ event }: { event: EventDetail }) {
               {t("dashboard.events.pair_agent_expires")}{" "}
               {new Date(pairingCode.expires_at).toLocaleTimeString(locale === "ar" ? "ar-SA" : "en-US")}
             </p>
+            <Link href="/help/camera" target="_blank" className="mt-2 block text-xs font-medium text-neutral-600 underline">
+              {locale === "ar" ? "دليل توصيل الكاميرا خطوة بخطوة" : "Step-by-step camera setup guide"}
+            </Link>
             <button
               type="button"
               onClick={() => setPairingCode(null)}
