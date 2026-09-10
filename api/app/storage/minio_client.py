@@ -22,6 +22,35 @@ def get_client():
     )
 
 
+@lru_cache
+def get_public_client():
+    """Same credentials, a different endpoint_url -- used only for
+    presigned_get_url(). A presigned URL is fetched directly by a guest's
+    or organizer's browser, which can't resolve settings.minio_endpoint
+    when that's docker-compose's internal service hostname ("minio:9000")
+    -- confirmed by hand: a phone on the same LAN got broken-image icons
+    for every thumbnail because the signed URL pointed at that
+    unresolvable-outside-Docker host. SigV4 signs the host as part of the
+    signature, so the URL has to be *signed* for whatever host the
+    browser will actually connect to, not just have its host swapped
+    after the fact -- hence a whole separate client rather than a
+    string-replace on the returned URL. settings.minio_public_endpoint
+    defaults to empty, which falls back to settings.minio_endpoint (the
+    common case: tests, and a real deployment where internal/external
+    endpoints are the same hostname).
+    """
+    scheme = "https" if settings.minio_secure else "http"
+    endpoint = settings.minio_public_endpoint or settings.minio_endpoint
+    return boto3.client(
+        "s3",
+        endpoint_url=f"{scheme}://{endpoint}",
+        aws_access_key_id=settings.minio_access_key,
+        aws_secret_access_key=settings.minio_secret_key,
+        config=BotoConfig(signature_version="s3v4"),
+        region_name="us-east-1",
+    )
+
+
 def ensure_bucket() -> None:
     client = get_client()
     try:
@@ -61,7 +90,7 @@ def presigned_get_url(
     params: dict[str, str] = {"Bucket": settings.minio_bucket, "Key": key}
     if download_filename:
         params["ResponseContentDisposition"] = f'attachment; filename="{download_filename}"'
-    return get_client().generate_presigned_url("get_object", Params=params, ExpiresIn=expires_in_seconds)
+    return get_public_client().generate_presigned_url("get_object", Params=params, ExpiresIn=expires_in_seconds)
 
 
 def delete_objects(keys: list[str]) -> list[str]:

@@ -20,6 +20,12 @@ class Settings(BaseSettings):
 
     # --- Object storage (MinIO in dev, S3-compatible in prod) ---
     minio_endpoint: str = "localhost:9000"
+    # The host a browser can actually resolve, for presigned URLs only
+    # (see app/storage/minio_client.py's get_public_client) -- distinct
+    # from minio_endpoint because that's the docker-compose *internal*
+    # service hostname ("minio:9000"), meaningless outside the Docker
+    # network. Empty (the default) falls back to minio_endpoint.
+    minio_public_endpoint: str = ""
     minio_access_key: str = "laqta"
     minio_secret_key: str = "laqta_dev_password"
     minio_bucket: str = "laqta-photos"
