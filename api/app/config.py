@@ -91,6 +91,13 @@ class Settings(BaseSettings):
     # still cleaned up immediately rather than left to accumulate.
     ftps_upload_root: str = "/tmp/laqta-ftps/uploads"
 
+    # --- Desktop watch-folder agent pairing (agent/, see docs) ---
+    # Deliberately short -- a photographer reads this off a screen once
+    # and types it into the agent within a few minutes; a long TTL just
+    # widens the window for a code shown on a shared/public dashboard
+    # screen to be used by the wrong person.
+    agent_pairing_code_ttl_minutes: int = 15
+
 
 @lru_cache
 def get_settings() -> Settings:

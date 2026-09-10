@@ -104,6 +104,13 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     "dashboard.events.ftp_shown_once": "احفظ كلمة المرور الآن — لن تظهر مرة أخرى.",
     "dashboard.events.ftp_close": "إغلاق",
 
+    "dashboard.events.pair_agent": "ربط وكيل التصوير",
+    "dashboard.events.pair_agent_generating": "جارٍ الإنشاء...",
+    "dashboard.events.pair_agent_code_label": "الرمز",
+    "dashboard.events.pair_agent_expires": "صالح حتى",
+    "dashboard.events.pair_agent_instructions": "افتح تطبيق وكيل لقطة على جهاز المصوّر وأدخل هذا الرمز.",
+    "dashboard.events.pair_agent_close": "إغلاق",
+
     "dashboard.moderate.codes_label": "رموز الشارة/السوار",
     "dashboard.moderate.codes_placeholder": "أدخل رمزًا",
     "dashboard.moderate.codes_add": "إضافة",
@@ -220,6 +227,13 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     "dashboard.events.ftp_password": "Password",
     "dashboard.events.ftp_shown_once": "Save this password now -- it won't be shown again.",
     "dashboard.events.ftp_close": "Close",
+
+    "dashboard.events.pair_agent": "Pair camera agent",
+    "dashboard.events.pair_agent_generating": "Generating...",
+    "dashboard.events.pair_agent_code_label": "Code",
+    "dashboard.events.pair_agent_expires": "Valid until",
+    "dashboard.events.pair_agent_instructions": "Open the Laqta Agent app on the photographer's laptop and enter this code.",
+    "dashboard.events.pair_agent_close": "Close",
 
     "dashboard.moderate.codes_label": "Bib/badge codes",
     "dashboard.moderate.codes_placeholder": "Enter a code",

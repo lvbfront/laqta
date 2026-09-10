@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocale } from "@/components/LocaleProvider";
 import { QrCode } from "@/components/QrCode";
 import * as api from "@/lib/api";
-import type { EventDetail, FtpCredentialIssued } from "@/lib/api";
+import type { AgentPairingCodeIssued, EventDetail, FtpCredentialIssued } from "@/lib/api";
 
 // NEXT_PUBLIC_SITE_URL, when set, wins over window.location.origin -- the
 // QR code has to encode a URL the *scanning device* (a guest's phone) can
@@ -29,6 +29,8 @@ export function EventCard({ event }: { event: EventDetail }) {
   const [copied, setCopied] = useState(false);
   const [ftpCredential, setFtpCredential] = useState<FtpCredentialIssued | null>(null);
   const [issuingFtp, setIssuingFtp] = useState(false);
+  const [pairingCode, setPairingCode] = useState<AgentPairingCodeIssued | null>(null);
+  const [issuingPairingCode, setIssuingPairingCode] = useState(false);
   const [currentSoloNumber, setCurrentSoloNumber] = useState(event.current_solo_number);
   const [advancing, setAdvancing] = useState(false);
 
@@ -62,6 +64,16 @@ export function EventCard({ event }: { event: EventDetail }) {
       setCurrentSoloNumber(result.current_solo_number);
     } finally {
       setAdvancing(false);
+    }
+  }
+
+  async function handleIssuePairingCode() {
+    setIssuingPairingCode(true);
+    try {
+      const issued = await api.issueAgentPairingCode(event.id);
+      setPairingCode(issued);
+    } finally {
+      setIssuingPairingCode(false);
     }
   }
 
@@ -137,9 +149,18 @@ export function EventCard({ event }: { event: EventDetail }) {
         <div className="mt-4 flex flex-wrap gap-3">
           <button
             type="button"
+            onClick={handleIssuePairingCode}
+            disabled={issuingPairingCode}
+            className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+          >
+            {issuingPairingCode ? t("dashboard.events.pair_agent_generating") : t("dashboard.events.pair_agent")}
+          </button>
+
+          <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+            className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 disabled:opacity-60"
           >
             {uploading ? t("dashboard.events.uploading") : t("dashboard.events.upload")}
           </button>
@@ -161,6 +182,27 @@ export function EventCard({ event }: { event: EventDetail }) {
             {issuingFtp ? t("dashboard.events.ftp_generating") : t("dashboard.events.ftp_credentials")}
           </button>
         </div>
+
+        {pairingCode && (
+          <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm">
+            <p className="text-neutral-600 mb-2">{t("dashboard.events.pair_agent_instructions")}</p>
+            <div className="flex items-baseline gap-3" dir="ltr">
+              <span className="text-xs text-neutral-500">{t("dashboard.events.pair_agent_code_label")}</span>
+              <span className="text-3xl font-bold tracking-widest font-mono">{pairingCode.code}</span>
+            </div>
+            <p className="mt-1 text-xs text-neutral-500">
+              {t("dashboard.events.pair_agent_expires")}{" "}
+              {new Date(pairingCode.expires_at).toLocaleTimeString(locale === "ar" ? "ar-SA" : "en-US")}
+            </p>
+            <button
+              type="button"
+              onClick={() => setPairingCode(null)}
+              className="mt-3 text-xs font-medium text-neutral-600 underline"
+            >
+              {t("dashboard.events.pair_agent_close")}
+            </button>
+          </div>
+        )}
 
         {ftpCredential && (
           <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">

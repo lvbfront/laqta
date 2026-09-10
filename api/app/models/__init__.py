@@ -2,6 +2,8 @@
 required for Alembic autogenerate and for create_all() in tests.
 """
 
+from app.models.agent_pairing_code import AgentPairingCode
+from app.models.agent_token import AgentToken
 from app.models.audit_log import AuditLog
 from app.models.download import Download
 from app.models.event import Event
@@ -18,6 +20,8 @@ from app.models.user import User
 from app.models.user_session import UserSession
 
 __all__ = [
+    "AgentPairingCode",
+    "AgentToken",
     "AuditLog",
     "Download",
     "Event",

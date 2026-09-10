@@ -12,6 +12,7 @@ from app.models.enums import UserRole
 from app.models.event import Event
 from app.models.user import User
 from app.models.user_session import UserSession
+from app.services.agent_pairing import authenticate_agent_token
 
 
 def get_current_user(
@@ -74,6 +75,36 @@ def require_event_access(
     event = db.get(Event, event_id)
     if event is None or event.org_id != user.org_id:
         raise HTTPException(status_code=404, detail={"code": "event_not_found", "message": "Event not found."})
+    return event
+
+
+def get_agent_event(
+    db: Annotated[Session, Depends(get_db)],
+    authorization: Annotated[str | None, Header()] = None,
+) -> Event:
+    """Auth for the desktop agent's own upload endpoint
+    (app/api/routes/agent.py) -- a bearer AgentToken, not a UserSession.
+    The agent never has a staff login; its token is scoped to exactly one
+    event (set at pairing time), so there's no separate org/role check to
+    layer on top the way require_event_access needs for a human session.
+    """
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=401, detail={"code": "missing_agent_token", "message": "Agent token required."}
+        )
+    token = authorization[len("bearer ") :].strip()
+
+    agent_token = authenticate_agent_token(db, token)
+    if agent_token is None:
+        raise HTTPException(
+            status_code=401, detail={"code": "invalid_agent_token", "message": "Invalid or revoked agent token."}
+        )
+
+    event = db.get(Event, agent_token.event_id)
+    if event is None:
+        raise HTTPException(
+            status_code=401, detail={"code": "invalid_agent_token", "message": "Invalid or revoked agent token."}
+        )
     return event
 
 

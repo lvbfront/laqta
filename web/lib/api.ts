@@ -281,3 +281,19 @@ export function nextGuest(eventId: string): Promise<{ current_solo_number: numbe
     headers: authHeaders(),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Desktop watch-folder agent pairing (see api/app/api/routes/agent_pairing.py)
+// ---------------------------------------------------------------------------
+
+export interface AgentPairingCodeIssued {
+  code: string;
+  expires_at: string;
+}
+
+export function issueAgentPairingCode(eventId: string): Promise<AgentPairingCodeIssued> {
+  return getJson(`/api/events/${eventId}/agent-pairing-codes`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+}

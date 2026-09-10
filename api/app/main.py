@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.formparsers import MultiPartParser
 
-from app.api.routes import auth, delivery, events, ftp_credentials, match, photos
+from app.api.routes import agent, agent_pairing, auth, delivery, events, ftp_credentials, match, photos
 from app.config import settings
 from app.storage import minio_client
 
@@ -106,6 +106,8 @@ app.include_router(match.router)
 app.include_router(delivery.router)
 app.include_router(events.router)
 app.include_router(ftp_credentials.router)
+app.include_router(agent_pairing.router)
+app.include_router(agent.router)
 
 # Routers land here as they're implemented:
 # from app.api.routes import moderation

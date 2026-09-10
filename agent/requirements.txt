@@ -1,0 +1,9 @@
+# --- Runtime ---
+watchdog==5.0.3
+requests==2.32.3
+# Cross-platform OS keychain (macOS Keychain, Windows Credential Locker) --
+# used so the agent's long-lived token is never a plaintext file on disk.
+keyring==25.5.0
+
+# --- Packaging (build machine only, not needed to just run the agent) ---
+pyinstaller==6.11.1
