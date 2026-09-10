@@ -7,8 +7,19 @@ import { QrCode } from "@/components/QrCode";
 import * as api from "@/lib/api";
 import type { EventDetail, FtpCredentialIssued } from "@/lib/api";
 
-const SITE_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
-const FTP_HOST = typeof window !== "undefined" ? window.location.hostname : "";
+// NEXT_PUBLIC_SITE_URL, when set, wins over window.location.origin -- the
+// QR code has to encode a URL the *scanning device* (a guest's phone) can
+// reach, not whatever host happened to load the dashboard in this
+// browser tab. Without this, opening the dashboard at localhost:3000
+// bakes "localhost" into every QR code, which only ever resolves on the
+// machine that generated it -- confirmed by hand: a phone scan of that
+// QR tries to reach the phone's own localhost and fails. Same reasoning
+// for FTP_HOST below.
+const SITE_ORIGIN =
+  process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "");
+const FTP_HOST =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/^https?:\/\//, "").replace(/:\d+$/, "") ||
+  (typeof window !== "undefined" ? window.location.hostname : "");
 const FTP_PORT = process.env.NEXT_PUBLIC_FTPS_PORT || "2121";
 
 export function EventCard({ event }: { event: EventDetail }) {
