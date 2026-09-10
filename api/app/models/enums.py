@@ -28,6 +28,14 @@ class MatchMode(str, enum.Enum):
     face = "face"
     code = "code"
     both = "both"
+    # A photo booth, not a moderation queue: a staff member taps "next
+    # guest" (Event.current_solo_number advances) between subjects, and
+    # every photo that lands while a number is "open" is auto-tagged with
+    # it (app/services/ingest.py) -- no biometric data, no staff typing a
+    # code by hand afterward. Same guest-facing lookup as 'code'
+    # (app/api/routes/match.py's match_by_code), just a different way of
+    # getting the PhotoCode row created.
+    sequential = "sequential"
 
 
 class PhotoStatus(str, enum.Enum):

@@ -39,7 +39,7 @@ export default function ModeratePage() {
     // Code-mode events therefore show every ready photo here, published or
     // not; approve/reject remain available too (still meaningful for a
     // strict code-mode event, or to unpublish a mistagged photo).
-    const showAllReady = ev.match_mode === "code" || ev.match_mode === "both";
+    const showAllReady = ev.match_mode === "code" || ev.match_mode === "both" || ev.match_mode === "sequential";
     setPhotos(showAllReady ? readyPhotos : readyPhotos.filter((p) => !p.published));
   }
 
@@ -104,7 +104,7 @@ export default function ModeratePage() {
   if (!event || photos === null) return <CenteredMessage>{t("common.loading")}</CenteredMessage>;
 
   const name = locale === "ar" ? event.name_ar : event.name_en;
-  const showCodeTagging = event.match_mode === "code" || event.match_mode === "both";
+  const showCodeTagging = event.match_mode === "code" || event.match_mode === "both" || event.match_mode === "sequential";
 
   return (
     <div className="min-h-[100dvh] p-4 sm:p-8">

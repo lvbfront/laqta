@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocale } from "@/components/LocaleProvider";
 import { QrCode } from "@/components/QrCode";
 import * as api from "@/lib/api";
@@ -29,9 +29,19 @@ export function EventCard({ event }: { event: EventDetail }) {
   const [copied, setCopied] = useState(false);
   const [ftpCredential, setFtpCredential] = useState<FtpCredentialIssued | null>(null);
   const [issuingFtp, setIssuingFtp] = useState(false);
+  const [currentSoloNumber, setCurrentSoloNumber] = useState(event.current_solo_number);
+  const [advancing, setAdvancing] = useState(false);
 
   const name = locale === "ar" ? event.name_ar : event.name_en;
   const guestUrl = `${SITE_ORIGIN}/e/${event.qr_token}`;
+
+  // The dashboard page polls listOrgEvents every few seconds -- pick up a
+  // number advanced from another device (a second booth screen, or the
+  // photographer's own phone) without waiting for a manual "next guest"
+  // tap here too.
+  useEffect(() => {
+    setCurrentSoloNumber(event.current_solo_number);
+  }, [event.current_solo_number]);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -42,6 +52,16 @@ export function EventCard({ event }: { event: EventDetail }) {
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleNextGuest() {
+    setAdvancing(true);
+    try {
+      const result = await api.nextGuest(event.id);
+      setCurrentSoloNumber(result.current_solo_number);
+    } finally {
+      setAdvancing(false);
     }
   }
 
@@ -94,6 +114,25 @@ export function EventCard({ event }: { event: EventDetail }) {
           {event.photo_count} {t("dashboard.events.photos")} · {event.ready_photo_count}{" "}
           {t("dashboard.events.ready")} · {event.pending_photo_count} {t("dashboard.events.pending")}
         </p>
+
+        {event.match_mode === "sequential" && (
+          <div className="mt-4 flex items-center gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+            <div>
+              <p className="text-xs text-neutral-500">{t("dashboard.events.booth_current_number")}</p>
+              <p className="text-3xl font-bold tabular-nums">
+                {currentSoloNumber ?? t("dashboard.events.booth_none_yet")}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleNextGuest}
+              disabled={advancing}
+              className="ms-auto rounded-full bg-neutral-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 active:scale-[0.98] transition"
+            >
+              {advancing ? t("dashboard.events.booth_advancing") : t("dashboard.events.booth_next_guest")}
+            </button>
+          </div>
+        )}
 
         <div className="mt-4 flex flex-wrap gap-3">
           <button

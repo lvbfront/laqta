@@ -12,7 +12,7 @@ export function CreateEventForm({ orgId, onCreated }: { orgId: string; onCreated
   const [nameEn, setNameEn] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [privacyMode, setPrivacyMode] = useState<"standard" | "strict">("standard");
-  const [matchMode, setMatchMode] = useState<"face" | "code" | "both">("face");
+  const [matchMode, setMatchMode] = useState<"face" | "code" | "both" | "sequential">("face");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,12 +105,13 @@ export function CreateEventForm({ orgId, onCreated }: { orgId: string; onCreated
           <span className="font-medium text-neutral-700">{t("dashboard.events.match_mode")}</span>
           <select
             value={matchMode}
-            onChange={(e) => setMatchMode(e.target.value as "face" | "code" | "both")}
+            onChange={(e) => setMatchMode(e.target.value as "face" | "code" | "both" | "sequential")}
             className="rounded-lg border border-neutral-300 px-3 py-2"
           >
             <option value="face">{t("dashboard.events.match_mode_face")}</option>
             <option value="code">{t("dashboard.events.match_mode_code")}</option>
             <option value="both">{t("dashboard.events.match_mode_both")}</option>
+            <option value="sequential">{t("dashboard.events.match_mode_sequential")}</option>
           </select>
         </label>
       </div>

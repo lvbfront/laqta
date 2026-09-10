@@ -115,9 +115,9 @@ async def match_selfie(
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(status_code=404, detail={"code": "event_not_found", "message": "Event not found."})
-    if event.match_mode == MatchMode.code:
-        # A code-only event's whole point is that no biometric data is
-        # ever processed for it (docs/plan.md) -- refusing here is what
+    if event.match_mode in (MatchMode.code, MatchMode.sequential):
+        # A code/sequential event's whole point is that no biometric data
+        # is ever processed for it (docs/plan.md) -- refusing here is what
         # actually makes that a guarantee rather than a UI convention a
         # guest (or a frontend bug) could bypass by hitting this endpoint
         # directly.

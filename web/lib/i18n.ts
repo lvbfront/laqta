@@ -88,6 +88,11 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     "dashboard.events.match_mode_face": "سيلفي (تعرف على الوجه)",
     "dashboard.events.match_mode_code": "رمز (سوار/شارة، بدون بيانات حيوية)",
     "dashboard.events.match_mode_both": "كلاهما",
+    "dashboard.events.match_mode_sequential": "رقم متسلسل (بوث تصوير فردي)",
+    "dashboard.events.booth_current_number": "الرقم الحالي",
+    "dashboard.events.booth_none_yet": "لم يبدأ بعد",
+    "dashboard.events.booth_next_guest": "الضيف التالي",
+    "dashboard.events.booth_advancing": "جارٍ...",
     "dashboard.events.logout": "تسجيل الخروج",
 
     "dashboard.events.ftp_credentials": "بيانات FTP",
@@ -117,6 +122,9 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     "guest.code_title": "أدخل رمز الشارة",
     "guest.code_instructions": "أدخل الرمز الموجود على شارتك أو سوارك للعثور على صورك",
     "guest.code_placeholder": "مثال: BIB1234",
+    "guest.number_title": "أدخل رقمك",
+    "guest.number_instructions": "أدخل الرقم الذي أعطاك إياه المصوّر للعثور على صورك",
+    "guest.number_placeholder": "مثال: 47",
     "guest.code_submit": "بحث",
     "guest.code_searching": "جارِ البحث...",
 
@@ -197,6 +205,11 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     "dashboard.events.match_mode_face": "Selfie (face recognition)",
     "dashboard.events.match_mode_code": "Code (wristband/badge, no biometric data)",
     "dashboard.events.match_mode_both": "Both",
+    "dashboard.events.match_mode_sequential": "Sequential number (solo photo booth)",
+    "dashboard.events.booth_current_number": "Current number",
+    "dashboard.events.booth_none_yet": "Not started yet",
+    "dashboard.events.booth_next_guest": "Next guest",
+    "dashboard.events.booth_advancing": "...",
     "dashboard.events.logout": "Log out",
 
     "dashboard.events.ftp_credentials": "FTP credentials",
@@ -226,6 +239,9 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     "guest.code_title": "Enter your badge code",
     "guest.code_instructions": "Enter the code on your badge or wristband to find your photos",
     "guest.code_placeholder": "e.g. BIB1234",
+    "guest.number_title": "Enter your number",
+    "guest.number_instructions": "Enter the number the photographer gave you to find your photos",
+    "guest.number_placeholder": "e.g. 47",
     "guest.code_submit": "Search",
     "guest.code_searching": "Searching...",
 

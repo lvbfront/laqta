@@ -52,7 +52,7 @@ export interface EventPublic {
   consent_text_ar: string;
   consent_text_en: string;
   privacy_mode: "standard" | "strict";
-  match_mode: "face" | "code" | "both";
+  match_mode: "face" | "code" | "both" | "sequential";
   status: string;
 }
 
@@ -167,6 +167,7 @@ export interface EventDetail extends EventPublic {
   photo_count: number;
   ready_photo_count: number;
   pending_photo_count: number;
+  current_solo_number: number | null;
 }
 
 export interface PhotoListItem {
@@ -191,7 +192,7 @@ export interface CreateEventInput {
   name_en: string;
   ends_at: string; // ISO datetime
   privacy_mode: "standard" | "strict";
-  match_mode: "face" | "code" | "both";
+  match_mode: "face" | "code" | "both" | "sequential";
 }
 
 export function createEvent(orgId: string, body: CreateEventInput): Promise<EventDetail> {
@@ -265,6 +266,17 @@ export interface FtpCredentialIssued {
 
 export function issueFtpCredential(eventId: string): Promise<FtpCredentialIssued> {
   return getJson(`/api/events/${eventId}/ftp-credentials`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Sequential ("photo booth") match mode (see api/app/api/routes/events.py)
+// ---------------------------------------------------------------------------
+
+export function nextGuest(eventId: string): Promise<{ current_solo_number: number }> {
+  return getJson(`/api/events/${eventId}/next-guest`, {
     method: "POST",
     headers: authHeaders(),
   });

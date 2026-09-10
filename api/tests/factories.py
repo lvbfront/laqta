@@ -43,6 +43,7 @@ def make_event(db: Session, org: Organization | None = None, **kwargs) -> Event:
         privacy_mode=kwargs.get("privacy_mode", PrivacyMode.standard),
         match_mode=kwargs.get("match_mode", MatchMode.face),
         auto_publish=kwargs.get("auto_publish", True),
+        current_solo_number=kwargs.get("current_solo_number"),
     )
     if "retention_until" in kwargs:
         event.retention_until = kwargs["retention_until"]

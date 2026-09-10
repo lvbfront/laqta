@@ -161,7 +161,12 @@ export default function GuestEventPage() {
       {flow.step === "capture" && <SelfieCapture onCapture={handleSelfie} onBack={() => setFlow({ step: "consent" })} />}
 
       {flow.step === "code" && (
-        <CodeEntry initialCode={codeFromUrl ?? undefined} submitting={false} onSubmit={handleCode} />
+        <CodeEntry
+          initialCode={codeFromUrl ?? undefined}
+          submitting={false}
+          onSubmit={handleCode}
+          variant={event?.match_mode === "sequential" ? "number" : "code"}
+        />
       )}
 
       {flow.step === "match_error" && (

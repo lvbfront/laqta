@@ -7,8 +7,10 @@ from dataclasses import dataclass
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.enums import PhotoStatus
+from app.models.enums import MatchMode, PhotoStatus
+from app.models.event import Event
 from app.models.photo import Photo
+from app.models.photo_code import PhotoCode
 from app.storage import minio_client
 from app.workers.jobs import process_photo
 from app.workers.queue import get_photo_processing_queue
@@ -64,6 +66,18 @@ def ingest_photo(db: Session, event_id: uuid.UUID, content: bytes, content_type:
     key = _original_key(event_id, photo.id)
     photo.s3_key_original = key
     minio_client.upload_bytes(key, content, content_type)
+
+    # match_mode='sequential' (a photo-booth: staff taps "next guest"
+    # between subjects, app/api/routes/events.py's advance_solo_number) --
+    # every photo that lands while a number is "open" gets auto-tagged
+    # with it, so nobody ever has to type a code in by hand. NULL means no
+    # "next guest" tap has happened yet (e.g. a stray upload before the
+    # booth actually opened) -- left untagged rather than guessed at;
+    # staff can still tag it manually via add_photo_code if needed.
+    event = db.get(Event, event_id)
+    if event is not None and event.match_mode == MatchMode.sequential and event.current_solo_number is not None:
+        db.add(PhotoCode(photo_id=photo.id, code=str(event.current_solo_number)))
+
     db.commit()
 
     get_photo_processing_queue().enqueue(process_photo, str(photo.id))

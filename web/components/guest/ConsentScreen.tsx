@@ -19,7 +19,10 @@ export function ConsentScreen({
   const consentText = locale === "ar" ? event.consent_text_ar : event.consent_text_en;
   const eventName = locale === "ar" ? event.name_ar : event.name_en;
   const showFaceButton = event.match_mode === "face" || event.match_mode === "both";
-  const showCodeButton = event.match_mode === "code" || event.match_mode === "both";
+  const showCodeButton = event.match_mode === "code" || event.match_mode === "both" || event.match_mode === "sequential";
+  // "code" and "sequential" are both biometric-free, just different ways
+  // a photo gets tagged with a number/code -- same non-face consent copy.
+  const isBiometricFree = event.match_mode === "code" || event.match_mode === "sequential";
 
   return (
     <div className="flex min-h-[100dvh] flex-col justify-between p-6">
@@ -47,7 +50,7 @@ export function ConsentScreen({
             className="mt-0.5 h-6 w-6 shrink-0 rounded border-neutral-300"
           />
           <span className="text-sm font-medium">
-            {event.match_mode === "code" ? t("consent.checkbox_code") : t("consent.checkbox")}
+            {isBiometricFree ? t("consent.checkbox_code") : t("consent.checkbox")}
           </span>
         </label>
       </div>

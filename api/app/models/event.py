@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -113,6 +113,14 @@ class Event(Base, UUIDPKMixin, TimestampMixin):
 
     brand_logo_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
     sponsor_overlay_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+    # match_mode='sequential' only: the number currently being auto-tagged
+    # onto incoming photos. NULL until the first "next guest" tap
+    # (app/api/routes/events.py's advance_solo_number); every ingested
+    # photo checks this at upload time and, if set, gets a matching
+    # PhotoCode (app/services/ingest.py). Meaningless for every other
+    # match_mode -- left NULL and ignored.
+    current_solo_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     organization: Mapped["Organization"] = relationship(back_populates="events")
     photos: Mapped[list["Photo"]] = relationship(back_populates="event")

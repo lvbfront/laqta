@@ -38,6 +38,19 @@ DEFAULT_CONSENT_EN_CODE = (
     "We never ask for a selfie or process any biometric data for this event."
 )
 
+# match_mode='sequential': the guest was handed a number by staff at the
+# moment they were photographed, not a pre-printed bib/badge -- distinct
+# wording from the code defaults above even though the underlying lookup
+# (app/api/routes/match.py's match_by_code) is identical.
+DEFAULT_CONSENT_AR_SEQUENTIAL = (
+    "عند تصويرك، سيُعطيك أحد أفراد الفريق رقمًا. أدخل هذا الرقم هنا لإيجاد صورك. "
+    "لن نطلب صورة وجهك أو نعالج أي بيانات حيوية على الإطلاق."
+)
+DEFAULT_CONSENT_EN_SEQUENTIAL = (
+    "When you're photographed, a staff member will give you a number. Enter it here to find your photos. "
+    "We never ask for a selfie or process any biometric data for this event."
+)
+
 
 class EventPublic(BaseModel):
     id: uuid.UUID
@@ -59,6 +72,10 @@ class EventDetail(EventPublic):
     photo_count: int
     ready_photo_count: int
     pending_photo_count: int
+    # match_mode='sequential' only -- the number currently being
+    # auto-tagged onto incoming photos, for a booth attendant's screen.
+    # None elsewhere / before the first "next guest" tap.
+    current_solo_number: int | None
 
 
 class EventCreate(BaseModel):
@@ -70,6 +87,22 @@ class EventCreate(BaseModel):
     match_mode: MatchMode = MatchMode.face
     consent_text_ar: str | None = None
     consent_text_en: str | None = None
+
+
+def _default_consent_ar(match_mode: MatchMode) -> str:
+    if match_mode == MatchMode.code:
+        return DEFAULT_CONSENT_AR_CODE
+    if match_mode == MatchMode.sequential:
+        return DEFAULT_CONSENT_AR_SEQUENTIAL
+    return DEFAULT_CONSENT_AR
+
+
+def _default_consent_en(match_mode: MatchMode) -> str:
+    if match_mode == MatchMode.code:
+        return DEFAULT_CONSENT_EN_CODE
+    if match_mode == MatchMode.sequential:
+        return DEFAULT_CONSENT_EN_SEQUENTIAL
+    return DEFAULT_CONSENT_EN
 
 
 def _event_to_detail(db: Session, event: Event) -> EventDetail:
@@ -94,6 +127,7 @@ def _event_to_detail(db: Session, event: Event) -> EventDetail:
         photo_count=total,
         ready_photo_count=ready,
         pending_photo_count=pending,
+        current_solo_number=event.current_solo_number,
     )
 
 
@@ -153,10 +187,8 @@ def create_event(
         starts_at=body.starts_at,
         ends_at=body.ends_at,
         status=EventStatus.active,
-        consent_text_ar=body.consent_text_ar
-        or (DEFAULT_CONSENT_AR_CODE if body.match_mode == MatchMode.code else DEFAULT_CONSENT_AR),
-        consent_text_en=body.consent_text_en
-        or (DEFAULT_CONSENT_EN_CODE if body.match_mode == MatchMode.code else DEFAULT_CONSENT_EN),
+        consent_text_ar=body.consent_text_ar or _default_consent_ar(body.match_mode),
+        consent_text_en=body.consent_text_en or _default_consent_en(body.match_mode),
         privacy_mode=body.privacy_mode,
         match_mode=body.match_mode,
         # DB check constraint forces this false for strict events
@@ -166,3 +198,43 @@ def create_event(
     db.add(event)
     db.commit()
     return _event_to_detail(db, event)
+
+
+class SoloNumberResult(BaseModel):
+    current_solo_number: int
+
+
+# Same actors as REST/FTPS photo ingest (app/api/routes/photos.py's
+# INGEST_ROLES) -- whoever's allowed to push photos into the event is
+# who's allowed to run its booth counter.
+SOLO_NUMBER_ROLES = (UserRole.owner, UserRole.staff, UserRole.photographer)
+
+
+@router.post("/api/events/{event_id}/next-guest", response_model=SoloNumberResult)
+def advance_solo_number(
+    db: Annotated[Session, Depends(get_db)],
+    event: Annotated[Event, Depends(require_event_access)],
+    _role: Annotated[object, Depends(require_role(*SOLO_NUMBER_ROLES))],
+) -> SoloNumberResult:
+    """match_mode='sequential' only: a staff member (or the photographer's
+    assistant) taps this between subjects at a photo booth. Every photo
+    that lands after this and before the next tap gets auto-tagged with
+    the returned number (app/services/ingest.py) -- no camera integration,
+    no staff typing a code in later.
+
+    SELECT ... FOR UPDATE, not a plain read-increment-write: two rapid
+    taps (a nervous double-tap, or two assistants on the same event) must
+    still hand out strictly increasing numbers, never the same one twice
+    or one silently lost to a race.
+    """
+    if event.match_mode != MatchMode.sequential:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "wrong_match_mode", "message": "This event doesn't use sequential numbering."},
+        )
+
+    locked = db.query(Event).filter(Event.id == event.id).with_for_update().one()
+    locked.current_solo_number = (locked.current_solo_number or 0) + 1
+    db.commit()
+
+    return SoloNumberResult(current_solo_number=locked.current_solo_number)
