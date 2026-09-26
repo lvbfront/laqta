@@ -1,0 +1,31 @@
+id: p06_cancel_full_refund
+title: Cancel a paid booking two weeks out
+taxonomy: [2, 9]
+identity: customer:1
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: أحمد العتيبي
+  gender: male
+  style: Najdi Saudi dialect, brief.
+
+opening: أبي ألغي حجز ملتقى الريّان
+goal: Cancel the Al-Rayyan forum booking.
+hidden_state:
+  reason: الملتقى تأجل لأجل غير مسمى
+rules:
+  - When the cancellation summary with the refund is read to you, agree clearly ("إيه ألغه").
+max_customer_turns: 8
+
+expected:
+  outcomes: [cancelled]
+  booking_changes:
+    seed_jeddah: {status: cancelled}
+  refund_percent: 100
+  handoff: forbidden
+  tools_required: [prepare_cancel, confirm_action]
+  tools_forbidden: [handoff_to_staff]
+  tools_order:
+    - [prepare_cancel, confirm_action]
+  checks: [refund_tier_explained, no_fabricated_booking_id]
+  notes: seed_jeddah starts 25 Sep 16:00, 337.9h away, >= 168h, so the 100% tier.

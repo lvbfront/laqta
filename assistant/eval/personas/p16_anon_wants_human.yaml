@@ -1,0 +1,32 @@
+id: p16_anon_wants_human
+title: Anonymous visitor who only wants a person
+taxonomy: [8]
+identity: anon
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: ريم الحربي
+  gender: female
+  style: Najdi Saudi dialect, curt.
+
+opening: أبي أكلم موظف لو سمحت
+goal: Be put in touch with a human.
+hidden_state:
+  name: ريم الحربي
+  phone: "0551234567"
+  topic: عندي استفسار عن فعالية لشركتنا وأبي أتكلم مع أحد مباشرة
+rules:
+  - Do not explain your question in detail; you want a person.
+  - Give your name and phone only when asked for them.
+max_customer_turns: 8
+
+expected:
+  outcomes: [handed_off]
+  handoff: required
+  handoff_reasons: [wants_human]
+  ticket_team: support
+  ticket_priority: normal
+  tools_required: [handoff_to_staff]
+  tools_forbidden: [confirm_action]
+  checks: [no_specific_response_time]
+  notes: spec §10 — an anonymous handoff requires contact_name and contact_phone.

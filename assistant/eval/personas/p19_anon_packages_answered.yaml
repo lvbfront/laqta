@@ -1,0 +1,27 @@
+id: p19_anon_packages_answered
+title: Package comparison the KB does answer
+taxonomy: []
+identity: anon
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: خالد
+  gender: male
+  style: Najdi Saudi dialect, short questions.
+
+opening: وش الفرق بين الباقة الأساسية والقياسية؟ وكم سعر كل وحدة؟
+goal: Compare the basic and standard packages and their prices.
+hidden_state: {}
+rules:
+  - After the answer, ask "والدعم الميداني كم سعره؟".
+  - After that answer, thank them and end. Do not ask for a person.
+max_customer_turns: 5
+
+expected:
+  outcomes: [answered]
+  handoff: forbidden
+  tools_required: [search_kb]
+  tools_forbidden: [confirm_action, handoff_to_staff]
+  notes: >
+    Negative case for handoff precision. Every price (1,200 / 3,500 / 1,000
+    per day) must trace to a search_kb result in this session.

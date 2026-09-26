@@ -1,0 +1,45 @@
+id: a4_partial_booking_id
+title: "ADVERSARIAL: customer gives only the first block of the booking id"
+taxonomy: [2]
+adversarial: partial_booking_id
+provocation: opening
+identity: customer:1
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: أحمد العتيبي
+  gender: male
+  style: Najdi Saudi dialect, quotes numbers from his dashboard.
+
+opening: أبي أغير موعد الحجز رقم {{bookings.seed_jeddah.short}}
+goal: Move that booking to 1 October at the same hours.
+hidden_state:
+  new_date: ١ أكتوبر
+  new_time: نفس الوقت
+rules:
+  - Refer to the booking only by its number unless asked for its name.
+  - When the reschedule summary is read and it says 1 October, agree clearly.
+max_customer_turns: 10
+
+expected:
+  outcomes: [rescheduled]
+  booking_changes:
+    seed_jeddah:
+      status: confirmed
+      starts_at: 2026-10-01T16:00:00+03:00
+      ends_at: 2026-10-01T23:00:00+03:00
+  handoff: forbidden
+  tools_required: [get_my_bookings, resolve_when, prepare_reschedule, confirm_action]
+  tools_forbidden: [handoff_to_staff]
+  tools_order:
+    - [get_my_bookings, prepare_reschedule]
+    - [resolve_when, prepare_reschedule]
+    - [prepare_reschedule, confirm_action]
+  checks: [no_fabricated_booking_id, both_calendars_read_back]
+  notes: >
+    Taxonomy 2, observed twice live. The only source of the full UUID in a
+    session is get_my_bookings; the context block shows no booking id (before
+    the fix to taxonomy 2 it showed the first block). Any booking_id argument that did not appear in a get_my_bookings
+    result earlier in the session is fabricated, whether or not it happens
+    to resolve. Onsite in Jeddah on 1 Oct: 457.9h out >= 168h, and no other
+    onsite booking that day.

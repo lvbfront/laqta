@@ -1,0 +1,91 @@
+# Every operational number the assistant uses. The single source of truth:
+# if a number changes, change it here AND in kb/laqta-kb.md.
+
+timezone: Asia/Riyadh
+
+lead_time_hours:
+  remote: 48
+  onsite: 168              # 7 days
+
+max_event_days: 3
+upload_opens_before_hours: 2
+upload_closes_after_hours: 24
+free_reschedule_before_hours: 48
+
+payment_deadline:
+  after_tentative_hours: 72
+  before_start_hours: 24   # whichever comes first
+
+refunds:                   # by time remaining before the start; paid bookings only
+  - {min_hours_before: 168, percent: 100}
+  - {min_hours_before: 48,  percent: 50}
+  - {min_hours_before: 0,   percent: 0}
+# The statuses that have been paid, so cancelling one applies the table above.
+# tentative is not here: "الحجز المبدئي اللي ما انْدفع ممكن يتلغى في أي وقت
+# بدون رسوم" (kb/laqta-kb.md, تعديل الموعد والإلغاء). mark_paid is what makes a
+# booking confirmed. A sibling key rather than a mapping around `refunds`,
+# which eval tests read as a plain list of tiers.
+refunds_apply_to: [confirmed]
+
+onsite:
+  cities: [jeddah, riyadh, dammam]
+  max_events_per_city_per_day: 2
+  included_in: [premium]
+  addon_for: [standard]
+
+packages:
+  starter:  {max_guests: 300,  max_photos: 2000,  seats: 1,    retention_days: 14}
+  standard: {max_guests: 1000, max_photos: 10000, seats: 3,    retention_days: 30}
+  premium:  {max_guests: null, max_photos: null,  seats: null, retention_days: 90}
+
+# أسماء الإضافات من قسم "الإضافات" في kb/laqta-kb.md.
+# الأسعار مقصود إنها مو هنا: المساعد ما يذكر سعر إلا من search_kb أو من الفريق.
+# الدعم الميداني مو في القائمة — هو حقل onsite_support في الحجز نفسه
+# مع onsite.addon_for فوق، وتمثيله مرتين يفتح باب تناقض المدخلات.
+addons:
+  - extra_photographer_seat      # مقعد مصور إضافي
+  - sponsor_overlay              # شعار الراعي على كل صورة
+  - extended_retention           # تمديد مدة الحفظ ٣٠ يوم
+  - same_day_highlight_video     # فيديو ملخص في نفس اليوم
+
+strict_mode:
+  retention_days: 7
+  default_match_mode: code
+  forbidden_addons: [extended_retention]
+
+confirmation_ttl_minutes: 10
+
+availability:
+  suggestion_count: 3        # nearest N available days offered on a rejection
+  suggestion_search_days: 30 # how far forward to look for them
+
+# من قسمَي "متى يحوّل المساعد للموظف" و"أوقات الاستجابة والتصعيد" في kb/laqta-kb.md.
+# إذا تغيّر أي رقم هنا، غيّره في المستند كمان.
+handoff:
+  routing:
+    discount: sales
+    premium_quote: sales
+    long_event: sales
+    late_change: ops
+    complaint: support
+    live_issue: support
+    legal: privacy
+    unknown_question: support
+    wants_human: support
+  # "شكوى من أي نوع، وتروح لمدير الفريق المعني مباشرة"
+  to_team_manager: [complaint]
+  priority_by_reason:
+    live_issue: urgent
+    legal: privacy
+  # مهلة الاستلام. ⚠️ المستند يحسبها بـ"ساعات العمل" للعادية والخصوصية،
+  # والطبقة ١ تطبّقها كوقت فعلي متصل. تقويم ساعات العمل من شغل الطبقة ٤.
+  acknowledge_within_minutes:
+    normal: 240              # ٤ ساعات عمل
+    urgent: 15
+    privacy: 480             # يوم عمل
+  # التذكير عند انتهاء المهلة، والتصعيد للمدير بعده بهذي المدة.
+  # تنستخدم في الطبقة ٤ (scheduled_actions)، محفوظة هنا عشان الأرقام بمكان واحد.
+  escalate_after_reminder_minutes:
+    normal: 480              # يوم عمل بعد التذكير
+    urgent: 15               # تذكير عند ١٥ دقيقة، تصعيد عند ٣٠
+    privacy: 960             # يومي عمل

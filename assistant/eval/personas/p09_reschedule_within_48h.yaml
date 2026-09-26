@@ -1,0 +1,34 @@
+id: p09_reschedule_within_48h
+title: Reschedule inside the 48h window needs staff approval
+taxonomy: []
+identity: customer:3
+now: 2026-09-11T14:05:00+03:00
+fixtures: [fahad_gala]
+
+voice:
+  name: فهد الشهري
+  gender: male
+  style: Najdi Saudi dialect, a little hurried.
+
+opening: أبي أأجل حفل تكريم الموظفين أسبوع
+goal: Push the staff awards night back one week.
+hidden_state:
+  new_date: السبت ١٩ سبتمبر
+  new_time: نفس الوقت، من ٨ إلى ١١ مساءً
+  reason: المدير العام مسافر
+rules:
+  - If told the team has to approve it, accept that and end the conversation politely.
+max_customer_turns: 8
+
+expected:
+  outcomes: [handed_off]
+  handoff: required
+  handoff_reasons: [late_change]
+  ticket_team: ops
+  ticket_priority: normal
+  tools_required: [handoff_to_staff]
+  tools_forbidden: [confirm_action]
+  checks: [no_specific_response_time]
+  notes: >
+    fahad_gala starts 12 Sep 20:00, 29.9h away, under
+    free_reschedule_before_hours 48. The booking must be unchanged.

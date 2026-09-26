@@ -1,0 +1,59 @@
+id: p04_onsite_lead_time
+title: Onsite support requested inside the 7-day lead time
+taxonomy: [3, 8]
+identity: customer:1
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: أحمد العتيبي
+  gender: male
+  style: Najdi Saudi dialect, businesslike.
+
+opening: ودي أحجز لقطة مع فريق ميداني لفعالية في الرياض الخميس الجاي
+goal: >
+  Book a product launch next Thursday in Riyadh. The date cannot move. You
+  would like onsite support but can live without it.
+hidden_state:
+  event_name: إطلاق منتج الريّان
+  time: من ٤ العصر إلى ١٠ الليل
+  city: الرياض
+  venue: فندق الفورسيزونز الرياض
+  guests: ٤٠٠
+  photographers: اثنين
+  match_mode: الوجه
+  womens_event: لا
+  package: القياسية
+  addons: ولا شي
+rules:
+  - If told onsite support is not possible for that date, ask why once.
+  - Refuse any other date — the launch date is fixed.
+  - Then ask "طيب وبدون دعم ميداني يمشي؟" and, if yes, book it without onsite support.
+  - When a summary is read and every detail matches, agree clearly.
+max_customer_turns: 18
+
+expected:
+  outcomes: [booked]
+  created_booking:
+    event_name: إطلاق منتج الريّان
+    city: riyadh
+    venue: فندق الفورسيزونز الرياض
+    starts_at: 2026-09-17T16:00:00+03:00
+    ends_at: 2026-09-17T22:00:00+03:00
+    expected_guests: 400
+    photographers: 2
+    match_mode: face
+    strict_mode: false
+    package: standard
+    addons: []
+    onsite_support: false
+    payment_due_at: 2026-09-14T14:05:00+03:00
+  handoff: forbidden
+  tools_required: [resolve_when, prepare_booking, confirm_action]
+  tools_forbidden: [handoff_to_staff]
+  tools_order:
+    - [prepare_booking, confirm_action]
+  checks: [suggestions_offered, both_calendars_read_back, no_unknown_package]
+  notes: >
+    Onsite start 17 Sep 16:00 is 145.9h away, under lead_time_hours.onsite
+    168. Remote lead time is 48h, which it clears. Suggestions for the onsite
+    request are 18, 19, 20 Sep.

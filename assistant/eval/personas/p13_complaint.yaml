@@ -1,0 +1,32 @@
+id: p13_complaint
+title: Complaint about slow photo delivery at a past event
+taxonomy: []
+identity: customer:1
+now: 2026-09-11T14:05:00+03:00
+fixtures: [ahmed_ended]
+
+voice:
+  name: أحمد العتيبي
+  gender: male
+  style: Najdi Saudi dialect, upset but polite.
+
+opening: عندي شكوى على معرض الريّان للسيارات الأسبوع الماضي، الضيوف انتظروا ساعات عشان توصلهم صورهم
+goal: Have the complaint recorded and escalated.
+hidden_state:
+  details: بعض الضيوف ما وصلتهم صور أبداً، والمصورين قالوا الرفع كان شغال
+rules:
+  - Give the details if asked.
+  - Reject excuses; you want it recorded with someone responsible.
+  - Once told it is recorded, end.
+max_customer_turns: 8
+
+expected:
+  outcomes: [handed_off]
+  handoff: required
+  handoff_reasons: [complaint]
+  ticket_team: support
+  ticket_priority: normal
+  tools_required: [handoff_to_staff]
+  tools_forbidden: [confirm_action]
+  checks: [no_specific_response_time]
+  notes: policy handoff.to_team_manager includes complaint — the ticket's assignee must be the support manager.

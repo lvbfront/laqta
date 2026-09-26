@@ -1,0 +1,82 @@
+# Retrieval fixtures for tests/test_kb_retrieval.py (spec §11).
+#
+# `sections` lists every section that would be a correct answer. Most
+# questions have exactly one. A few facts are stated twice in the knowledge
+# base on purpose — retention days, Windows support, Hijri dates and the
+# onsite cities all appear in their own section AND in "أسئلة شائعة" — so
+# both are accepted. Penalising a right answer would make hit@1 lie.
+
+public:
+  - q: وش الفرق بين الباقة الأساسية والقياسية؟
+    sections: [الباقات]
+  - q: كم سعر مقعد مصور إضافي؟
+    sections: [الإضافات]
+  - q: متى يفتح رفع الصور قبل بداية الفعالية؟
+    sections: [حجز وتفعيل الفعالية]
+  - q: المنظمون يدفعون بفاتورة ولا بالبطاقة؟
+    sections: [الدفع وتأكيد الحجز]
+  - q: إذا ألغيت الحجز قبل الفعالية بعشرة أيام، كم يرجع لي؟
+    sections: [تعديل الموعد والإلغاء]
+  - q: هل تحفظون صورة السيلفي؟
+    sections: [الخصوصية وحماية البيانات, أسئلة شائعة]
+  - q: عندنا حفل نسائي ونبغى خصوصية عالية، وش تقدمون؟
+    sections: [الفعاليات النسائية والوضع المشدد]
+  - q: كاميرتي ما فيها خاصية FTP، كيف أرفع الصور؟
+    sections: [ربط الكاميرات, أسئلة شائعة]
+  - q: أنا مصور مستقل، أقدر أستخدم لقطة مع عملائي؟
+    sections: [خدمة المصورين]
+  - q: وش ساعات العمل عندكم؟
+    sections: [ساعات العمل والتواصل]
+  - q: هل الضيف يحتاج يحمّل تطبيق؟
+    sections: [أسئلة شائعة, كيف تشتغل لقطة]
+  - q: نبغى نتعرف على الضيوف بدون بيانات حيوية، وش الخيار؟
+    sections: [طرق التعرّف على الضيوف]
+  - q: كم أقصى مدة لفعالية واحدة؟
+    sections: [حجز وتفعيل الفعالية]
+  - q: هل فيه ألبوم عام يتصفح فيه الناس كل صور الفعالية؟
+    sections: [الخصوصية وحماية البيانات, أسئلة شائعة, عن لقطة]
+  - q: وش المعلومات المطلوبة عشان أحجز فعالية؟
+    sections: [حجز وتفعيل الفعالية]
+  - q: برنامج الرفع متوفر لويندوز؟
+    sections: [ربط الكاميرات, أسئلة شائعة]
+  - q: كم مدة حفظ الصور في الوضع المشدد؟
+    sections: [الفعاليات النسائية والوضع المشدد, أسئلة شائعة]
+  - q: أقدر أحدد موعد الفعالية بالتاريخ الهجري؟
+    sections: [حجز وتفعيل الفعالية, أسئلة شائعة]
+  - q: كم مهلة الدفع بعد الحجز المبدئي؟
+    sections: [الدفع وتأكيد الحجز]
+  - q: الدعم الميداني متاح في أي مدن؟
+    sections: [ساعات العمل والتواصل, أسئلة شائعة]
+
+# Answered only by internal sections. A customer or a visitor must never
+# retrieve these chunks, however well the question matches them.
+internal:
+  - q: كم فعالية بدعم ميداني تغطون باليوم لكل مدينة؟
+    sections: [سعة التشغيل]
+  - q: العميل يطلب خصم، وش السياسة؟
+    sections: [قواعد العروض والخصومات, متى يحوّل المساعد للموظف]
+  - q: كم مهلة استلام التذكرة العاجلة؟
+    sections: [أوقات الاستجابة والتصعيد]
+  - q: أي فريق مسؤول عن تمديد فعالية شغالة؟
+    sections: [الفرق والمسؤوليات, متى يحوّل المساعد للموظف]
+  - q: متى أحوّل المحادثة لفريق المبيعات؟
+    sections: [متى يحوّل المساعد للموظف, قواعد العروض والخصومات]
+
+# Nothing in the knowledge base answers these, so search must return
+# no_relevant_section and the instructions turn that into a handoff.
+#
+# The set is deliberately adversarial, because KB_MIN_SCORE is derived from
+# the highest-scoring negative here: the flight question says "book" and
+# names a city, the restaurant one names a city Laqta serves, and the tyre
+# one is a how-to phrased like the camera-setup sections. The last two came
+# from hand-testing (≈0.371 and ≈0.426), the tyre question landing just
+# under the previous noise ceiling of 0.428 — which is why adding it can
+# move the threshold. Widening this set is the cheapest way to make the
+# threshold trustworthy; layer 2 should keep growing it.
+off_topic:
+  - كيف أطبخ الكبسة؟
+  - وش سعر البيتكوين اليوم؟
+  - من فاز بكأس العالم في كرة القدم؟
+  - أبغى أحجز تذكرة طيران إلى القاهرة
+  - وش أفضل مطعم في جدة؟
+  - كيف أغير إطارات السيارة؟

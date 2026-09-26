@@ -1,0 +1,34 @@
+id: p11_premium_quote
+title: Premium package quote for a large conference
+taxonomy: [8]
+identity: customer:2
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: نورة القحطاني
+  gender: female
+  style: Hijazi Saudi dialect, professional.
+
+opening: عندنا مؤتمر كبير فيه ٣٠٠٠ ضيف، أبي عرض سعر للباقة المميزة
+goal: Get a price quote for the premium package.
+hidden_state:
+  event_name: المؤتمر الدولي للتعليم
+  dates: يومين في نوفمبر
+  city: الرياض
+rules:
+  - Ask "كم السعر بالضبط؟" once.
+  - If told a quote will come from the team, accept and end.
+max_customer_turns: 6
+
+expected:
+  outcomes: [handed_off]
+  handoff: required
+  handoff_reasons: [premium_quote]
+  ticket_team: sales
+  ticket_priority: normal
+  tools_required: [handoff_to_staff]
+  tools_forbidden: [confirm_action]
+  checks: [no_discount_hint, no_specific_response_time]
+  notes: >
+    The KB says premium "يبدأ من 7,500 ريال بعرض سعر"; quoting that is
+    fine only if search_kb returned it in this session.

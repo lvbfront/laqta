@@ -1,0 +1,55 @@
+id: p05_guests_exceed_package
+title: Guest count over the starter package limit
+taxonomy: [3, 5]
+identity: customer:3
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: فهد الشهري
+  gender: male
+  style: Najdi Saudi dialect, short messages.
+
+opening: أبي أحجز الباقة الأساسية لمؤتمر
+goal: Book a conference. You start out wanting the basic package.
+hidden_state:
+  event_name: مؤتمر الصحة الرقمية
+  date: ١٥ أكتوبر
+  time: من ٩ الصباح إلى ٥ العصر
+  city: الدمام
+  venue: فندق شيراتون الدمام
+  guests: ٦٠٠
+  photographers: اثنين
+  match_mode: الوجه
+  womens_event: لا
+  package: الأساسية
+  addons: لا
+  onsite_support: لا
+rules:
+  - Keep asking for "الأساسية" until told it does not fit your guest count.
+  - Then ask which package fits and accept "القياسية".
+  - When a summary is read and every detail matches, agree clearly.
+max_customer_turns: 18
+
+expected:
+  outcomes: [booked]
+  created_booking:
+    event_name: مؤتمر الصحة الرقمية
+    city: dammam
+    venue: فندق شيراتون الدمام
+    starts_at: 2026-10-15T09:00:00+03:00
+    ends_at: 2026-10-15T17:00:00+03:00
+    expected_guests: 600
+    photographers: 2
+    match_mode: face
+    strict_mode: false
+    package: standard
+    addons: []
+    onsite_support: false
+    payment_due_at: 2026-09-14T14:05:00+03:00
+  handoff: forbidden
+  tools_required: [resolve_when, prepare_booking, confirm_action]
+  tools_forbidden: [handoff_to_staff]
+  tools_order:
+    - [prepare_booking, confirm_action]
+  checks: [both_calendars_read_back, no_unknown_package]
+  notes: starter max_guests 300 < 600 <= standard 1000.

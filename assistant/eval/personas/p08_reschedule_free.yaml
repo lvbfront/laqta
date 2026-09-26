@@ -1,0 +1,36 @@
+id: p08_reschedule_free
+title: Reschedule a paid booking well outside the 48h window
+taxonomy: [2]
+identity: customer:3
+now: 2026-09-11T14:05:00+03:00
+fixtures: [fahad_forum]
+
+voice:
+  name: فهد الشهري
+  gender: male
+  style: Najdi Saudi dialect, short messages.
+
+opening: أبي أغير موعد منتدى الأعمال الرقمي
+goal: Move the digital business forum one week later, same hours.
+hidden_state:
+  new_date: ١٥ أكتوبر
+  new_time: نفس الوقت، من ٤ العصر إلى ١٠ الليل
+rules:
+  - When the reschedule summary is read and the date and time match, agree clearly.
+max_customer_turns: 10
+
+expected:
+  outcomes: [rescheduled]
+  booking_changes:
+    fahad_forum:
+      status: confirmed
+      starts_at: 2026-10-15T16:00:00+03:00
+      ends_at: 2026-10-15T22:00:00+03:00
+  handoff: forbidden
+  tools_required: [resolve_when, prepare_reschedule, confirm_action]
+  tools_forbidden: [handoff_to_staff]
+  tools_order:
+    - [resolve_when, prepare_reschedule]
+    - [prepare_reschedule, confirm_action]
+  checks: [both_calendars_read_back, no_fabricated_booking_id]
+  notes: 649.9h before the current start, so the free reschedule applies.

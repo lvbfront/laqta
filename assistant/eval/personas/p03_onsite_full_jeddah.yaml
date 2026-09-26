@@ -1,0 +1,64 @@
+id: p03_onsite_full_jeddah
+title: Onsite booking on a full day in Jeddah
+taxonomy: [3, 10]
+identity: customer:3
+now: 2026-09-11T14:05:00+03:00
+fixtures: [second_jeddah_onsite]
+
+voice:
+  name: فهد الشهري
+  gender: male
+  style: Najdi Saudi dialect, direct, short messages.
+
+opening: أبي أحجز فعالية في جدة مع دعم ميداني
+goal: Book an onsite-supported business meetup in Jeddah.
+hidden_state:
+  event_name: ملتقى رواد الأعمال
+  date: ٢٥ سبتمبر
+  time: من ٤ العصر إلى ١١ الليل
+  city: جدة
+  venue: فندق الريتز كارلتون جدة
+  guests: ٦٠٠
+  photographers: مصورين اثنين
+  match_mode: الوجه
+  womens_event: لا
+  package: القياسية
+  addons: بس الدعم الميداني
+  onsite_support: إيه لازم دعم ميداني
+rules:
+  - If told the date is not available, ask once why ("ليش؟ مليان؟ كم فعالية عندكم ذاك اليوم؟").
+  - Then take the first alternative date offered, same times and same details.
+  - If no alternative is offered, ask for the nearest available day.
+  - When a summary is read and every detail matches, agree clearly.
+max_customer_turns: 18
+
+expected:
+  outcomes: [booked]
+  created_booking:
+    event_name: ملتقى رواد الأعمال
+    city: jeddah
+    venue: فندق الريتز كارلتون جدة
+    starts_at: 2026-09-26T16:00:00+03:00
+    ends_at: 2026-09-26T23:00:00+03:00
+    expected_guests: 600
+    photographers: 2
+    match_mode: face
+    strict_mode: false
+    package: standard
+    addons: []
+    onsite_support: true
+    payment_due_at: 2026-09-14T14:05:00+03:00
+  # The spec gives onsite_full suggestions, not a handoff, and full dates are
+  # not in the system prompt's handoff list. Taxonomy 10's "files nothing" is
+  # reported as a diagnostic, not scored as a handoff miss.
+  handoff: optional
+  handoff_reasons: [wants_human]
+  tools_required: [resolve_when, prepare_booking, confirm_action]
+  tools_order:
+    - [prepare_booking, confirm_action]
+  checks: [no_capacity_implication, suggestions_offered, both_calendars_read_back, no_unknown_package]
+  notes: >
+    25 Sep is full: seed_jeddah + second_jeddah_onsite = 2 =
+    max_events_per_city_per_day. First suggestion at the same clock times is
+    26 Sep (count 0, lead time 348h >= 168h). Onsite on standard is an add-on
+    (onsite.addon_for), so it is allowed.

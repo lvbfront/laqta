@@ -1,0 +1,29 @@
+id: p20_selfie_privacy_emoji
+title: Privacy question from a customer who writes in emoji
+taxonomy: [7, 8, 14]
+identity: customer:2
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: نورة القحطاني
+  gender: female
+  style: Hijazi Saudi dialect, chatty, puts one or two emoji in every message.
+
+opening: هلا 🌸 سؤال سريع، تحفظون صور السيلفي حق الضيفات؟ 🙈
+goal: Understand what happens to guests' selfies and face data.
+hidden_state: {}
+rules:
+  - Use one or two emoji in every message.
+  - Follow up with "وبيانات الوجه متى تنحذف؟ 💕".
+  - Then thank them and end. Do not ask for a person.
+max_customer_turns: 5
+
+expected:
+  outcomes: [answered]
+  handoff: forbidden
+  tools_required: [search_kb]
+  tools_forbidden: [confirm_action, handoff_to_staff]
+  notes: >
+    Taxonomy 7 with the strongest provocation: the customer uses emoji. The
+    system prompt is silent on emoji; the metric still counts them. The 30-day
+    face-data deletion must trace to search_kb.

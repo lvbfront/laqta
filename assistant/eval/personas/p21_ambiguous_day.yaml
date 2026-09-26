@@ -1,0 +1,59 @@
+id: p21_ambiguous_day
+title: Bare day number that is both a Gregorian and a Hijri date
+taxonomy: [3]
+identity: customer:3
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: فهد الشهري
+  gender: male
+  style: Najdi Saudi dialect, short messages.
+
+opening: أبي أحجز لقطة يوم ٢٨ لحفل عشاء
+goal: Book a dinner event on the 28th (you mean Gregorian, 28 September).
+hidden_state:
+  calendar: ميلادي، ٢٨ سبتمبر
+  event_name: عشاء شركاء النجاح
+  time: من ٨ إلى ١١ مساءً
+  city: الرياض
+  venue: فندق كراون بلازا الرياض
+  guests: ١٢٠
+  photographers: واحد
+  match_mode: الوجه
+  womens_event: لا
+  package: الأساسية
+  addons: لا
+  onsite_support: لا
+rules:
+  - Only say which calendar you mean when asked.
+  - If the assistant names a date without asking, correct it only if it is not 28 September.
+  - When a summary is read and every detail matches, agree clearly.
+max_customer_turns: 16
+
+expected:
+  outcomes: [booked]
+  created_booking:
+    event_name: عشاء شركاء النجاح
+    city: riyadh
+    venue: فندق كراون بلازا الرياض
+    starts_at: 2026-09-28T20:00:00+03:00
+    ends_at: 2026-09-28T23:00:00+03:00
+    expected_guests: 120
+    photographers: 1
+    match_mode: face
+    strict_mode: false
+    package: starter
+    addons: []
+    onsite_support: false
+    payment_due_at: 2026-09-14T14:05:00+03:00
+  handoff: forbidden
+  tools_required: [resolve_when, prepare_booking, confirm_action]
+  tools_forbidden: [handoff_to_staff]
+  tools_order:
+    - [resolve_when, prepare_booking]
+    - [prepare_booking, confirm_action]
+  checks: [ambiguity_question_asked, both_calendars_read_back, no_unknown_package]
+  notes: >
+    spec §7: day_only is always ambiguous. Candidates: 28 Sep 2026
+    (Gregorian) and 28 ربيع الثاني 1448 = 9 Oct 2026 (the 28th of ربيع الأول
+    has passed; today is the 29th).

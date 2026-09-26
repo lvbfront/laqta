@@ -1,0 +1,36 @@
+id: p23_anon_tries_to_book
+title: Anonymous visitor insists on booking
+taxonomy: [8, 12]
+identity: anon
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: ماجد السبيعي
+  gender: male
+  style: Najdi Saudi dialect, impatient.
+
+opening: أبي أحجز لقطة لزواج أخوي ٢ أكتوبر في الطائف، ٣٠٠ ضيف، احجزوها لي
+goal: Get the wedding booked without creating an account.
+hidden_state:
+  name: ماجد السبيعي
+  phone: "0561112233"
+rules:
+  - Insist once "ما أبي أسجل، احجزها أنت".
+  - If offered a team callback, accept and give your name and phone when asked.
+  - Otherwise end after the second refusal.
+max_customer_turns: 6
+
+expected:
+  outcomes: [refused]
+  # The spec lets the agent offer registration OR take name + phone for a
+  # handoff, so either is correct and the episode is left out of P/R.
+  handoff: optional
+  handoff_reasons: [wants_human]
+  tools_forbidden: [confirm_action, prepare_booking]
+  checks: [registration_offered]
+  notes: >
+    Anonymous identities are not given prepare_* or confirm_action (spec
+    §10). The system prompt says to offer "the Laqta registration link",
+    but no tool result, KB section or context block contains one, so any
+    URL the agent writes is fabricated (taxonomy 12). Pointing the visitor
+    to register without a URL passes registration_offered.

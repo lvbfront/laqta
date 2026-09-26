@@ -1,0 +1,139 @@
+# Bookings that exist before a conversation starts, loaded only by the
+# personas that list them. Every episode also gets scripts/seed.py's data:
+# 12 staff, contacts 1–3 (أحمد العتيبي, نورة القحطاني, فهد الشهري) and the
+# seed booking `seed_jeddah` — contact 1, «ملتقى الريّان», Jeddah, onsite,
+# premium, confirmed, 2026-09-25 16:00–23:00 Riyadh.
+#
+# Every persona runs at now = 2026-09-11T14:05+03:00 (Friday, 29 ربيع الأول
+# 1448), the spec §7 reference moment. Hours-before-start below are measured
+# from it and re-checked by tests/test_eval_personas.py.
+
+bookings:
+
+  # Contact 2's onsite booking on the seed day in Jeddah. With seed_jeddah it
+  # fills that day (policy onsite.max_events_per_city_per_day = 2).
+  second_jeddah_onsite:
+    id: c31313eb-f1bb-404c-8b3c-075da77ce751
+    contact: 2
+    event_name: حفل زواج عائلة الغامدي
+    city: jeddah
+    venue: قاعة الياقوت
+    starts_at: 2026-09-25T17:00:00+03:00
+    ends_at: 2026-09-25T23:00:00+03:00
+    expected_guests: 350
+    photographers: 2
+    match_mode: face
+    strict_mode: false
+    package: premium
+    onsite_support: true
+    status: confirmed
+    tentative_at: 2026-09-01T10:00:00+03:00
+
+  # 649.9h out: 100% refund tier, free reschedule.
+  fahad_forum:
+    id: 4a1371c3-2b66-4b3c-a80f-70065e656ace
+    contact: 3
+    event_name: منتدى الأعمال الرقمي
+    city: riyadh
+    venue: فندق الفيصلية
+    starts_at: 2026-10-08T16:00:00+03:00
+    ends_at: 2026-10-08T22:00:00+03:00
+    expected_guests: 800
+    photographers: 3
+    match_mode: code
+    strict_mode: false
+    package: standard
+    onsite_support: false
+    status: confirmed
+    tentative_at: 2026-09-01T10:00:00+03:00
+
+  # 91.9h out: 50% refund tier (between 168h and 48h), still reschedulable.
+  fahad_expo:
+    id: 456276dd-6bcb-4f6f-a701-ac9d5e919fc3
+    contact: 3
+    event_name: معرض ريادة الأعمال
+    city: dammam
+    venue: مركز الظهران للمعارض
+    starts_at: 2026-09-15T10:00:00+03:00
+    ends_at: 2026-09-15T18:00:00+03:00
+    expected_guests: 500
+    photographers: 2
+    match_mode: code
+    strict_mode: false
+    package: standard
+    onsite_support: false
+    status: confirmed
+    tentative_at: 2026-09-02T09:00:00+03:00
+
+  # 29.9h out: inside the 48h free-reschedule cutoff; 0% refund tier.
+  fahad_gala:
+    id: 43a66378-a995-46ae-af3c-e0d0c3924d81
+    contact: 3
+    event_name: حفل تكريم الموظفين
+    city: riyadh
+    venue: قاعة الأمير سلطان
+    starts_at: 2026-09-12T20:00:00+03:00
+    ends_at: 2026-09-12T23:00:00+03:00
+    expected_guests: 150
+    photographers: 1
+    match_mode: face
+    strict_mode: false
+    package: starter
+    onsite_support: false
+    status: confirmed
+    tentative_at: 2026-09-03T12:00:00+03:00
+
+  # Running right now (started 09:00, upload window opened 07:00).
+  fahad_live:
+    id: b5ef651f-6d7c-47c5-a0d8-16f35464df96
+    contact: 3
+    event_name: مؤتمر التقنية المالية
+    city: riyadh
+    venue: مركز الرياض الدولي للمؤتمرات والمعارض
+    starts_at: 2026-09-11T09:00:00+03:00
+    ends_at: 2026-09-11T21:00:00+03:00
+    expected_guests: 900
+    photographers: 3
+    match_mode: face
+    strict_mode: false
+    package: standard
+    onsite_support: false
+    status: live
+    tentative_at: 2026-08-25T11:00:00+03:00
+
+  # Unpaid tentative, 74.9h out: the 50% tier by the refund table, but the KB
+  # says an unpaid tentative booking cancels at any time without fees.
+  fahad_workshop_tentative:
+    id: b3b3cba8-1c1f-47ee-8114-7765c3f2b527
+    contact: 3
+    event_name: ورشة التسويق الرقمي
+    city: jeddah
+    venue: فندق روزوود جدة
+    starts_at: 2026-09-15T17:00:00+03:00
+    ends_at: 2026-09-15T21:00:00+03:00
+    expected_guests: 80
+    photographers: 1
+    match_mode: code
+    strict_mode: false
+    package: starter
+    onsite_support: false
+    status: tentative
+    tentative_at: 2026-09-10T11:00:00+03:00
+
+  # Contact 1's past event, for the complaint.
+  ahmed_ended:
+    id: 49e44c70-65d6-46b7-a4f2-475183ef3c6e
+    contact: 1
+    event_name: معرض الريّان للسيارات
+    city: riyadh
+    venue: واجهة الرياض
+    starts_at: 2026-09-03T16:00:00+03:00
+    ends_at: 2026-09-03T23:00:00+03:00
+    expected_guests: 700
+    photographers: 2
+    match_mode: face
+    strict_mode: false
+    package: standard
+    onsite_support: false
+    status: ended
+    tentative_at: 2026-08-10T10:00:00+03:00

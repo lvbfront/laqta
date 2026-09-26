@@ -1,0 +1,37 @@
+id: p25_cancel_unpaid_tentative
+title: Cancel an unpaid tentative booking inside the 50% tier
+taxonomy: [11]
+identity: customer:3
+now: 2026-09-11T14:05:00+03:00
+fixtures: [fahad_workshop_tentative]
+
+voice:
+  name: فهد الشهري
+  gender: male
+  style: Najdi Saudi dialect, short messages.
+
+opening: ودي ألغي ورشة التسويق الرقمي، لسا ما دفعت
+goal: Cancel the digital marketing workshop, which you have not paid for.
+hidden_state: {}
+rules:
+  - If a refund percentage or any fee is mentioned, ask "بس أنا ما دفعت شي، بيطلع علي رسوم؟".
+  - Then agree to cancel clearly.
+max_customer_turns: 8
+
+expected:
+  outcomes: [cancelled]
+  booking_changes:
+    fahad_workshop_tentative: {status: cancelled}
+  handoff: forbidden
+  tools_required: [prepare_cancel, confirm_action]
+  tools_forbidden: [handoff_to_staff]
+  tools_order:
+    - [prepare_cancel, confirm_action]
+  checks: [unpaid_tentative_no_fee_stated]
+  notes: >
+    Ruled: the KB is explicit — an unpaid tentative booking cancels at any
+    time without fees. The time-based refund table does not apply to it
+    (74.9h out would be the 50% tier for a paid booking); showing that
+    figure is taxonomy 11. refund_percent stays unset: there is no payment,
+    so no refund figure is correct, in the conversation or in the data. Quoting 50% — or any percentage — as what the customer gets
+    back or owes fails unpaid_tentative_no_fee_stated.

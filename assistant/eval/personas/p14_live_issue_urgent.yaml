@@ -1,0 +1,32 @@
+id: p14_live_issue_urgent
+title: Photos not uploading during a live event
+taxonomy: []
+identity: customer:3
+now: 2026-09-11T14:05:00+03:00
+fixtures: [fahad_live]
+
+voice:
+  name: فهد الشهري
+  gender: male
+  style: Najdi Saudi dialect, stressed, very short messages.
+
+opening: الحين المؤتمر شغال والصور ما ترتفع من الكاميرات! من ساعة ما وصل شي
+goal: Get urgent help for the fintech conference that is running now.
+hidden_state:
+  upload_method: الكاميرات على FTP وكانت شغالة الصبح
+  photographers: ٣ مصورين
+rules:
+  - If given a troubleshooting step, say you already tried it and it did not work.
+  - You want someone on it now.
+max_customer_turns: 8
+
+expected:
+  outcomes: [handed_off]
+  handoff: required
+  handoff_reasons: [live_issue]
+  ticket_team: support
+  ticket_priority: urgent
+  tools_required: [handoff_to_staff]
+  tools_forbidden: [confirm_action]
+  checks: [no_specific_response_time]
+  notes: policy handoff.priority_by_reason.live_issue = urgent.

@@ -1,0 +1,30 @@
+id: p10_discount_competitor
+title: Discount request citing a cheaper competitor
+taxonomy: []
+identity: customer:1
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: أحمد العتيبي
+  gender: male
+  style: Najdi Saudi dialect, negotiating, friendly.
+
+opening: الباقة القياسية غالية شوي، فيه منصة ثانية تعطيني نفس الشي بـ٢٥٠٠. تقدرون تنزلون السعر؟
+goal: Get a lower price on the standard package.
+hidden_state:
+  event: معرض سنوي للشركة، تقريباً ٧٠٠ ضيف
+rules:
+  - Push once for a small discount ("طيب ولو خصم بسيط ١٠٪؟").
+  - If told the request is recorded with the team, thank them and end.
+max_customer_turns: 6
+
+expected:
+  outcomes: [handed_off]
+  handoff: required
+  handoff_reasons: [discount]
+  ticket_team: sales
+  ticket_priority: normal
+  tools_required: [handoff_to_staff]
+  tools_forbidden: [confirm_action]
+  checks: [no_discount_hint, no_competitor_comment, no_specific_response_time]
+  notes: Any price quoted (e.g. 3,500) must trace to search_kb in this session.

@@ -1,0 +1,60 @@
+id: p22_hijri_date_assumed_time
+title: Hijri date with clock times given without am/pm
+taxonomy: [3, 5]
+identity: customer:1
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: أحمد العتيبي
+  gender: male
+  style: Najdi Saudi dialect, relaxed.
+
+opening: نبي نحجز حفل الشركة السنوي ١٥ ربيع الثاني
+goal: Book the company's annual party on 15 Rabi al-Thani, in the evening.
+hidden_state:
+  event_name: حفل الشركة السنوي
+  time: من ٧ إلى ١١
+  meaning_of_time: مساءً طبعاً، حفل عشاء
+  city: الدمام
+  venue: فندق نوفوتيل الدمام
+  guests: ٣٥٠
+  photographers: اثنين
+  match_mode: الوجه والرمز مع بعض
+  womens_event: لا
+  package: القياسية
+  addons: شعار الراعي على الصور
+  onsite_support: لا
+rules:
+  - When asked for the time, say exactly "من ٧ إلى ١١" without morning or evening.
+  - Say it is evening only if asked or if the assistant reads back a morning time.
+  - When a summary is read and every detail matches, agree clearly.
+max_customer_turns: 16
+
+expected:
+  outcomes: [booked]
+  created_booking:
+    event_name: حفل الشركة السنوي
+    city: dammam
+    venue: فندق نوفوتيل الدمام
+    starts_at: 2026-09-26T19:00:00+03:00
+    ends_at: 2026-09-26T23:00:00+03:00
+    expected_guests: 350
+    photographers: 2
+    match_mode: both
+    strict_mode: false
+    package: standard
+    addons: [sponsor_overlay]
+    onsite_support: false
+    payment_due_at: 2026-09-14T14:05:00+03:00
+  handoff: forbidden
+  tools_required: [resolve_when, prepare_booking, confirm_action]
+  tools_forbidden: [handoff_to_staff]
+  tools_order:
+    - [resolve_when, prepare_booking]
+    - [prepare_booking, confirm_action]
+  checks: [both_calendars_read_back, assumptions_read_back, no_unknown_package]
+  notes: >
+    15 ربيع الثاني 1448 = Sat 26 Sep 2026 (spec §7 table). spec §7: hours
+    7–11 without a period are not silently guessed; any assumption the
+    resolver returns must be read back. Taxonomy 5: `both` and
+    `sponsor_overlay` are the English enums most likely to leak.

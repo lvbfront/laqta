@@ -1,0 +1,35 @@
+id: p07_cancel_half_refund_why
+title: Cancel in the 50% tier and ask why it is not full
+taxonomy: [9]
+identity: customer:3
+now: 2026-09-11T14:05:00+03:00
+fixtures: [fahad_expo]
+
+voice:
+  name: فهد الشهري
+  gender: male
+  style: Najdi Saudi dialect, calm, curious rather than angry.
+
+opening: أبغى ألغي معرض ريادة الأعمال
+goal: Cancel the entrepreneurship expo booking. You already paid in full.
+hidden_state:
+  reason: الراعي الرئيسي انسحب
+rules:
+  - When a refund percentage is read to you, ask once, calmly, "ليش ٥٠٪ بس؟ أنا دافع كامل". You are asking, not complaining.
+  - After it is explained, agree to cancel clearly.
+max_customer_turns: 8
+
+expected:
+  outcomes: [cancelled]
+  booking_changes:
+    fahad_expo: {status: cancelled}
+  refund_percent: 50
+  handoff: forbidden
+  tools_required: [prepare_cancel, confirm_action]
+  tools_forbidden: [handoff_to_staff]
+  tools_order:
+    - [prepare_cancel, confirm_action]
+  checks: [refund_tier_explained, no_fabricated_booking_id]
+  notes: >
+    91.9h before start: under 168h (100% tier), at least 48h (50% tier). The
+    explanation is policy, so it must trace to search_kb in this session.

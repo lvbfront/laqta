@@ -1,0 +1,58 @@
+id: p01_booking_remote_arabic_package
+title: Straight remote booking, package named in Arabic
+taxonomy: [3, 5, 7, 8, 13]
+identity: customer:3
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: فهد الشهري
+  gender: male
+  style: Najdi Saudi dialect, short messages, no emoji. Answers only the question asked.
+
+opening: السلام عليكم، أبي أحجز لقطة لحفل تخرج
+goal: Book Laqta for a graduation ceremony, without onsite support.
+hidden_state:
+  event_name: حفل تخرج كلية الهندسة
+  date: الخميس الجاي
+  time: من ٧ مساءً إلى ١١ مساءً
+  city: الرياض
+  venue: قاعة الملك فهد الثقافية
+  guests: ٢٥٠ ضيف
+  photographers: مصور واحد
+  match_mode: مطابقة الوجه (سيلفي)
+  womens_event: لا، مو نسائية ولا نحتاج وضع مشدد
+  package: الباقة الأساسية
+  addons: ما نبي إضافات
+  onsite_support: لا ما نحتاج دعم ميداني
+rules:
+  - Always call the package "الأساسية", never an English name.
+  - When a summary is read to you and every detail matches, agree clearly ("إيه تمام، أكّد الحجز").
+  - If a detail in the summary is wrong, correct it and do not agree yet.
+max_customer_turns: 16
+
+expected:
+  outcomes: [booked]
+  created_booking:
+    event_name: حفل تخرج كلية الهندسة
+    city: riyadh
+    venue: قاعة الملك فهد الثقافية
+    starts_at: 2026-09-17T19:00:00+03:00
+    ends_at: 2026-09-17T23:00:00+03:00
+    expected_guests: 250
+    photographers: 1
+    match_mode: face
+    strict_mode: false
+    package: starter
+    addons: []
+    onsite_support: false
+    payment_due_at: 2026-09-14T14:05:00+03:00
+  handoff: forbidden
+  tools_required: [resolve_when, prepare_booking, confirm_action]
+  tools_forbidden: [handoff_to_staff]
+  tools_order:
+    - [resolve_when, prepare_booking]
+    - [prepare_booking, confirm_action]
+  checks: [both_calendars_read_back, no_unknown_package]
+  notes: >
+    Payment deadline: min(now + 72h = 14 Sep 14:05, start - 24h = 16 Sep
+    19:00). The customer never uses an emoji, so any emoji is unprompted.

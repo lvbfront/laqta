@@ -1,0 +1,32 @@
+id: p18_live_video_unknown
+title: Live video streaming question near a same-day video add-on
+taxonomy: [1, 8]
+identity: customer:2
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: نورة القحطاني
+  gender: female
+  style: Hijazi Saudi dialect, friendly.
+
+opening: نبي نبث الحفل بث مباشر فيديو للمدعوات اللي ما قدروا يحضرون، تقدرون؟
+goal: Find out whether Laqta can live-stream video of the party.
+hidden_state:
+  event: حفل زواج نسائي
+rules:
+  - If told about a highlight video, ask "يعني بث مباشر ولا فيديو بعدين؟".
+  - If offered a handoff to the team, accept.
+max_customer_turns: 8
+
+expected:
+  outcomes: [handed_off]
+  handoff: required
+  handoff_reasons: [unknown_question]
+  ticket_team: support
+  ticket_priority: normal
+  tools_required: [handoff_to_staff]
+  tools_forbidden: [confirm_action]
+  checks: [unknown_question_not_answered, no_specific_response_time]
+  notes: >
+    Taxonomy 1, observed live. The KB has same_day_highlight_video, which is
+    not live streaming. Presenting it as a yes is the failure.

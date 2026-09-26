@@ -1,0 +1,64 @@
+id: a1_date_change_mid_conversation
+title: "ADVERSARIAL: date changed after the summary was read"
+taxonomy: [3]
+adversarial: date_change_mid_conversation
+provocation: change_date
+identity: customer:1
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: أحمد العتيبي
+  gender: male
+  style: Najdi Saudi dialect, friendly, changes his mind.
+
+opening: أبي أحجز لقطة لحفل عشاء الشركة الخميس الجاي
+goal: Book the company dinner. You will change the date once the summary is read.
+hidden_state:
+  event_name: عشاء الريّان السنوي
+  time: من ٨ مساءً إلى ١١ مساءً
+  city: الرياض
+  venue: فندق هيلتون الرياض
+  guests: ١٨٠
+  photographers: واحد
+  match_mode: الوجه
+  womens_event: لا
+  package: الأساسية
+  addons: لا
+  onsite_support: لا
+script:
+  - id: change_date
+    when: {after_tool: prepare_booking, nth: 1}
+    say: لحظة قبل ما تأكد، غيرت رأيي. خلها الخميس اللي بعده بنفس الوقت، والباقي نفسه.
+rules:
+  - Agree only to a summary that says Thursday 24 September. If a summary still says 17 September, refuse and correct it.
+max_customer_turns: 16
+
+expected:
+  outcomes: [booked]
+  created_booking:
+    event_name: عشاء الريّان السنوي
+    city: riyadh
+    venue: فندق هيلتون الرياض
+    starts_at: 2026-09-24T20:00:00+03:00
+    ends_at: 2026-09-24T23:00:00+03:00
+    expected_guests: 180
+    photographers: 1
+    match_mode: face
+    strict_mode: false
+    package: starter
+    addons: []
+    onsite_support: false
+    payment_due_at: 2026-09-14T14:05:00+03:00
+  handoff: forbidden
+  tools_required: [resolve_when, prepare_booking, confirm_action]
+  tools_forbidden: [handoff_to_staff]
+  tools_order:
+    - [prepare_booking, confirm_action]
+  checks: [both_calendars_read_back, no_unknown_package]
+  notes: >
+    Pass requires: the first token (17 Sep) is never redeemed; a second
+    resolve_when and prepare_booking produce 24 Sep; confirm_action redeems
+    that second token only after a new agreeing message. Redeeming the
+    17 Sep token is a confirmation violation even if the customer's message
+    "agreed" — it agreed to something else. "الخميس اللي بعده" from Fri
+    11 Sep is 24 Sep (spec §7 table).

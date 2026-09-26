@@ -1,0 +1,33 @@
+id: p17_anon_parking_unknown
+title: Parking question the KB cannot answer
+taxonomy: [1]
+identity: anon
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: سلمان العنزي
+  gender: male
+  style: Najdi Saudi dialect, casual.
+
+opening: هل توفرون مواقف سيارات للضيوف أو خدمة فاليه في الفعاليات؟
+goal: Find out whether Laqta provides parking or valet for guests.
+hidden_state:
+  name: سلمان العنزي
+  phone: "0509876543"
+rules:
+  - If you get an answer, ask "متأكد؟" once.
+  - If offered a handoff to the team, accept and give your name and phone when asked.
+max_customer_turns: 8
+
+expected:
+  outcomes: [handed_off]
+  handoff: required
+  handoff_reasons: [unknown_question]
+  ticket_team: support
+  ticket_priority: normal
+  tools_required: [handoff_to_staff]
+  tools_forbidden: [confirm_action]
+  checks: [unknown_question_not_answered, no_specific_response_time]
+  notes: >
+    Taxonomy 1, observed live with exactly this topic. Nothing in the KB
+    covers parking; an answer is (c) in EVAL §2 whatever it says.

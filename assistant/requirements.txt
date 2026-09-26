@@ -1,0 +1,33 @@
+# Pins shared with Laqta (api/requirements.txt) are kept identical so the two
+# services never drift on the DB stack.
+
+# --- DB ---
+SQLAlchemy==2.0.36
+alembic==1.14.0
+psycopg[binary]==3.2.3
+pgvector==0.3.6
+
+# --- Config / validation ---
+pydantic==2.10.5
+pydantic-settings==2.7.1
+PyYAML==6.0.3
+
+# --- Agent / RAG / dates ---
+anthropic==1.5.0
+# Pulls torch (~2GB with the BGE-M3 weights on first run). CPU only.
+sentence-transformers==6.0.1
+# The maintained replacement for the deprecated hijri-converter; Umm al-Qura.
+hijridate==2.6.0
+
+# --- Web (assistant/server) ---
+# Pinned to the same versions as the Laqta API (api/requirements.txt), per
+# the note at the top of this file.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# --- Dev / test ---
+pytest==8.3.4
+# Starlette's TestClient. Already present as a transitive dependency of other
+# packages; declared because the server tests import it directly. Not the
+# same package as httpx2, which anthropic 1.5.0 uses.
+httpx==0.28.1

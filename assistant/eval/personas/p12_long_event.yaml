@@ -1,0 +1,34 @@
+id: p12_long_event
+title: Ten-day seasonal event, over max_event_days
+taxonomy: []
+identity: customer:1
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: أحمد العتيبي
+  gender: male
+  style: Najdi Saudi dialect, enthusiastic.
+
+opening: عندنا موسم شتوي في الرياض يمتد ١٠ أيام، نبي لقطة طول الموسم
+goal: Book Laqta for a ten-day winter season event.
+hidden_state:
+  event_name: موسم الريّان الشتوي
+  dates: من ١ نوفمبر إلى ١٠ نوفمبر
+  time: من ٤ العصر إلى ١٢ الليل كل يوم
+  city: الرياض
+  venue: حديقة السويدي
+  guests: حوالي ٥٠٠٠ باليوم
+rules:
+  - If told it needs the sales team, accept and end.
+max_customer_turns: 8
+
+expected:
+  outcomes: [handed_off]
+  handoff: required
+  handoff_reasons: [long_event]
+  ticket_team: sales
+  ticket_priority: normal
+  tools_required: [handoff_to_staff]
+  tools_forbidden: [confirm_action, prepare_booking]
+  checks: [no_specific_response_time]
+  notes: 10 days > policy max_event_days 3.

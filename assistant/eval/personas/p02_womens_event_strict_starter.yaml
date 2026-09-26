@@ -1,0 +1,68 @@
+id: p02_womens_event_strict_starter
+title: Women's event on the starter package, asks for a strict-forbidden add-on
+taxonomy: [3, 5, 6, 8, 13]
+identity: customer:2
+now: 2026-09-11T14:05:00+03:00
+
+voice:
+  name: نورة القحطاني
+  gender: female
+  style: Hijazi Saudi dialect, polite, medium-length messages, no emoji.
+
+opening: مرحبا، عندنا حفلة نسائية ونبي نستخدم لقطة
+goal: >
+  Book a women's graduation party. You believe the basic package keeps
+  photos for 14 days, as its description says; do not mention this belief
+  unless retention comes up.
+hidden_state:
+  event_name: حفل تخرج طالبات الثانوية
+  date: ١ أكتوبر
+  time: من ٥ العصر إلى ٩ الليل
+  city: جدة
+  venue: قاعة ليالي الحجاز
+  guests: ٢٠٠ ضيفة
+  photographers: مصورة وحدة
+  match_mode: بالرمز، الضيفات ما يبون سيلفي
+  womens_event: إيه نسائية بالكامل
+  package: الأساسية
+  addons: نبي تمديد مدة حفظ الصور
+  onsite_support: لا
+rules:
+  - When asked about add-ons, ask for the retention extension (تمديد مدة الحفظ).
+  - If told that add-on is not allowed for this kind of event, accept dropping it and continue.
+  - When a summary is read and every detail matches, agree clearly.
+max_customer_turns: 16
+
+expected:
+  outcomes: [booked]
+  created_booking:
+    event_name: حفل تخرج طالبات الثانوية
+    city: jeddah
+    venue: قاعة ليالي الحجاز
+    starts_at: 2026-10-01T17:00:00+03:00
+    ends_at: 2026-10-01T21:00:00+03:00
+    expected_guests: 200
+    photographers: 1
+    match_mode: code
+    strict_mode: true
+    package: starter
+    addons: []
+    onsite_support: false
+    payment_due_at: 2026-09-14T14:05:00+03:00
+  handoff: forbidden
+  tools_required: [resolve_when, prepare_booking, confirm_action]
+  tools_forbidden: [handoff_to_staff]
+  tools_order:
+    - [resolve_when, prepare_booking]
+    - [prepare_booking, confirm_action]
+  checks:
+    - retention_change_stated
+    - strict_mode_explained
+    - code_matching_suggested
+    - both_calendars_read_back
+    - no_unknown_package
+  notes: >
+    policy strict_mode.retention_days = 7 overrides starter's 14, and
+    extended_retention is in strict_mode.forbidden_addons. The KB's strict
+    mode section states the 7 days, so the agent can ground it through
+    search_kb; stating it without that call is a grounding error.
