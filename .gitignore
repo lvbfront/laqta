@@ -31,3 +31,6 @@ redisdata/
 # Editors
 .vscode/
 .idea/
+
+# Local face-test photos of real people — never commit
+pics/
