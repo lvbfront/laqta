@@ -63,6 +63,11 @@ class UploadQueue:
         self._conn.row_factory = sqlite3.Row
         with self._lock:
             self._conn.executescript(_SCHEMA)
+            # Only one agent process owns this file, so an 'uploading' row
+            # at open time was cut off by a crash/kill -- next_ready()
+            # never picks 'uploading', so without this it's stuck forever.
+            # Re-sending is safe: the server dedupes on MD5 ("duplicate").
+            self._conn.execute("UPDATE uploads SET status = 'pending' WHERE status = 'uploading'")
             self._conn.commit()
 
     def close(self) -> None:

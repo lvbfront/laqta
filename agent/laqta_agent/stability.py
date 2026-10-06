@@ -23,6 +23,30 @@ def snapshot(path: Path) -> FileSnapshot | None:
     return FileSnapshot(size=st.st_size, mtime=st.st_mtime)
 
 
+def looks_complete(path: Path) -> bool:
+    """A file that starts like a JPEG (SOI, FF D8) only counts as complete
+    once it also ends like one (EOI, FF D9, ignoring zero padding). Size+
+    mtime alone isn't enough: a Wi-Fi transfer that stalls for longer
+    than one stability window looks "unchanged" halfway through, and the
+    half file would be uploaded (tests/test_watcher_scenarios.py).
+    An empty file is never complete: transfer software can create the
+    file first and fill it in later. Anything else (RAW, non-JPEG)
+    passes -- size+mtime still applies.
+    """
+    # ponytail: a JPEG with no EOI at all is never uploaded; add a long
+    # unchanged-for-N-seconds escape hatch if a real camera produces one.
+    try:
+        with open(path, "rb") as f:
+            head = f.read(2)
+            if head != b"\xff\xd8":
+                return head != b""
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 4096))
+            return f.read().rstrip(b"\x00").endswith(b"\xff\xd9")
+    except OSError:
+        return False
+
+
 class StabilityTracker:
     """The number one source of corrupt partial uploads in watch-folder
     tools is uploading a file mid-write -- a camera/tethering app can
@@ -69,7 +93,7 @@ class StabilityTracker:
                     del self._last_seen[path]
                     continue
                 previous = self._last_seen[path]
-                if previous is not None and previous == current:
+                if previous is not None and previous == current and looks_complete(path):
                     newly_stable.append(path)
                     del self._last_seen[path]
                 else:
