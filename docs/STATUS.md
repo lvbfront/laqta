@@ -27,7 +27,20 @@ Open problems, deliberately not fixed yet, with where they live in the code (lin
 
 ## Other open items
 
-- **`guest_faces` table:** no longer written (selfie embeddings are discarded since 2026-10-06; the old rows were deleted by migration `7f05f01ae4fa`). The empty table, its model and its purge path remain. Decision pending: drop them.
+- **Dead code: the `guest_faces` table** (decided 2026-10-06: leave it, remove later). Nothing writes it since selfie embeddings stopped being stored, and migration `7f05f01ae4fa` deleted the old rows. To remove it later:
+  - **Write a migration that drops the table.** It was created in `api/alembic/versions/73fb312b9091_initial_schema.py`.
+  - **Delete these together:**
+    - the model: `api/app/models/guest_face.py`
+    - its export: `api/app/models/__init__.py:13,31`
+    - the `Guest.faces` relationship: `api/app/models/guest.py:18,58`
+    - the purge path, with its `guest_faces_deleted` report field: `api/app/workers/purge.py:15,41,136-163,181,201`
+    - the job log line: `api/app/workers/jobs.py:114-115`
+    - the CLI output: `api/scripts/purge.py:2,34`
+  - **Update the tests that build `GuestFace` rows:**
+    - `api/tests/test_purge.py`: guest-face cases at lines 23-43, 123-139, 176-212
+    - `api/tests/test_guest_cascade.py:5-32`
+    - `api/tests/test_code_match.py:6,77`
+    - `api/tests/test_match_api.py:6,44-45` (keep the "nothing stored" intent another way)
 - **Guests on a phone in dev:** gallery images are presigned MinIO URLs, and MinIO is localhost-only. Phone browsers also need HTTPS for the camera. Guest testing in dev is from the Mac's browser only.
 - **Agent: a finished file that's edited later is never re-uploaded.** The queue is keyed by path (`agent/laqta_agent/queue_db.py`, `enqueue`), so a changed file at the same path is ignored.
 - **No "processed" or "published" timestamps:** `photos` has no `processed_at`/`updated_at`, and `published` has none unless a moderator acted. `scripts/camera_check` shows when it observed those states.
