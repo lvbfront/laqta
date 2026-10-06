@@ -27,8 +27,7 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     "capture.button": "التقاط",
     "capture.retake": "إعادة المحاولة",
     "capture.use_photo": "استخدام هذه الصورة",
-    "capture.upload_fallback": "أو اختر صورة من جهازك",
-    "capture.camera_unavailable": "الكاميرا غير متاحة على هذا الجهاز. اختر صورة بدلاً من ذلك.",
+    "capture.camera_unavailable": "الكاميرا غير متاحة. اسمح للمتصفح باستخدام الكاميرا، ثم ارجع وحاول مرة أخرى.",
     "capture.searching": "جارِ البحث عن صورك...",
 
     // Match errors
@@ -156,8 +155,7 @@ export const dictionaries: Record<Locale, Record<string, string>> = {
     "capture.button": "Capture",
     "capture.retake": "Retake",
     "capture.use_photo": "Use this photo",
-    "capture.upload_fallback": "Or choose a photo from your device",
-    "capture.camera_unavailable": "Camera isn't available on this device. Choose a photo instead.",
+    "capture.camera_unavailable": "Camera isn't available. Allow camera access in your browser, then go back and try again.",
     "capture.searching": "Searching for your photos...",
 
     "error.no_face_detected": "We couldn't find a face in your photo. Make sure your face is clearly visible and try again.",

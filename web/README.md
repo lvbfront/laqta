@@ -22,8 +22,9 @@ postgres redis minio` + the API running, or `docker compose up api worker`).
 ## Routes
 
 - `/e/[qr_token]` — guest flow: consent (bilingual text from the event
-  record) → selfie capture (`getUserMedia`, falls back to a file picker if
-  unavailable/denied) → matched gallery (download / "this isn't me" /
+  record) → selfie capture (`getUserMedia` only -- no file-picker fallback,
+  so the selfie can't be a stored photo; if the camera is unavailable or
+  denied the guest is told to allow it) → matched gallery (download / "this isn't me" /
   "remove this photo of me").
 - `/dashboard/events` — create an event, view its QR + guest link, live
   (polled) upload/processing counts, per-event photo upload.

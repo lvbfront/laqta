@@ -56,8 +56,9 @@ arm64 Docker image, not just a host venv):
   verified for real in a headless-Chromium browser (Playwright), not just
   built: consent screen with a never-pre-ticked checkbox, the locale
   toggle actually flipping `dir`/`lang` and every string on screen, the
-  camera-unavailable fallback to a file picker, and a **complete real
-  match run** — uploaded a real selfie through the file-upload fallback,
+  camera-unavailable fallback to a file picker (since removed: the selfie
+  must come from the live camera), and a **complete real match run** —
+  uploaded a real selfie through that file-upload fallback,
   it hit the real backend, ran the real buffalo_l model, found the real
   photo, rendered the watermarked preview, and both "this isn't me" and
   "remove this photo of me" (with its confirm dialog) worked end-to-end,

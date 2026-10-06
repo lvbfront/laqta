@@ -15,7 +15,6 @@ export function SelfieCapture({ onCapture, onBack }: { onCapture: (blob: Blob) =
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>("starting");
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
@@ -28,8 +27,9 @@ export function SelfieCapture({ onCapture, onBack }: { onCapture: (blob: Blob) =
 
   const startCamera = useCallback(async () => {
     // Older phones / browsers without getUserMedia (or a non-HTTPS
-    // context, where browsers refuse it entirely) fall back to a plain
-    // file picker below -- this is that fallback's trigger condition.
+    // context, where browsers refuse it entirely). There is deliberately no
+    // file-picker fallback: the selfie has to come from the live camera, not
+    // from a stored photo of someone (docs/FACE_PIPELINE.md, question d).
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraStatus("unavailable");
       return;
@@ -45,7 +45,7 @@ export function SelfieCapture({ onCapture, onBack }: { onCapture: (blob: Blob) =
       setCameraStatus("active");
     } catch {
       // Permission denied, no camera, or any other getUserMedia failure --
-      // all land on the same file-upload fallback rather than a dead end.
+      // the guest sees how to fix camera access, and can go back and retry.
       setCameraStatus("unavailable");
     }
   }, []);
@@ -92,14 +92,6 @@ export function SelfieCapture({ onCapture, onBack }: { onCapture: (blob: Blob) =
     setCapturedBlob(null);
     setPreviewUrl(null);
     startCamera();
-  }
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    stopCamera();
-    setCapturedBlob(file);
-    setPreviewUrl(URL.createObjectURL(file));
   }
 
   const showingPreview = capturedBlob !== null;
@@ -171,25 +163,6 @@ export function SelfieCapture({ onCapture, onBack }: { onCapture: (blob: Blob) =
             className="h-20 w-20 rounded-full bg-white ring-4 ring-white/30 active:scale-95 transition"
           />
         ) : null}
-
-        {!showingPreview && (
-          <>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="text-sm font-medium text-white/80 underline underline-offset-4"
-            >
-              {t("capture.upload_fallback")}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-          </>
-        )}
       </div>
     </div>
   );

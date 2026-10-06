@@ -116,6 +116,8 @@ def guest_selfie(qr_token: str, selfie_jpeg: bytes, work: Path, label: str) -> t
         page.locator("input[type=checkbox]").check()
         page.locator("button:enabled", has_text="متابعة").or_(page.locator("button:enabled", has_text="Continue")).click()
         page.locator("video").wait_for()
+        # The selfie must come from the camera: no way to hand in a stored image instead.
+        assert page.locator("input[type=file]").count() == 0, "FAIL: the selfie screen offers a file upload"
         page.wait_for_function("document.querySelector('video').videoWidth > 0")
         page.get_by_role("button", name="التقاط").or_(page.get_by_role("button", name="Capture")).click()
         with page.expect_response(lambda r: r.url.endswith("/match") and r.request.method == "POST") as resp_info:

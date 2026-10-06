@@ -58,9 +58,9 @@ Per-person deletion of a bystander's embedding: **not implemented.**
 - Liveness detection: **not implemented.**
 - Device binding: **not implemented.**
 - Rate limiting on `/match`: **not implemented** (no limiter anywhere in `api/app`).
-- The guest page has an upload-a-file fallback that accepts any image (`SelfieCapture.tsx:184-190`), and the API takes any image file (`match.py:104`).
+- The guest page's upload-a-file option was removed on 2026-10-06: the page only takes a frame from the live camera (`web/components/guest/SelfieCapture.tsx`), and `scripts/e2e_smoke` asserts no file input exists. That only raises the bar. The API still takes any image file (`match.py:104`), and a still image can be shown to the camera or fed in as a virtual camera.
 
-Anyone with the event's QR link and a clear photo of someone (e.g. from social media) gets that person's matched photos. The e2e smoke test does exactly this: it feeds a still image into the camera path.
+Anyone with the event's QR link and a clear photo of someone (e.g. from social media) can still get that person's matched photos. The e2e smoke test does exactly this: it feeds a still image into the browser as its camera.
 
 **e. Are embeddings encrypted at rest, and who can read them?**
 **Not encrypted** at the application or database level. They are plain pgvector `vector(512)` columns (`face.py:64`, `api/app/models/guest_face.py:32`; no pgcrypto or app-level encryption anywhere in `api/app`). At-rest protection depends on the host disk: in dev, the `pgdata` Docker volume on this Mac.
