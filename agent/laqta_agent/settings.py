@@ -29,7 +29,7 @@ def load_settings() -> Settings:
     if not path.exists():
         return Settings()
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return Settings()
     return Settings(
@@ -40,4 +40,4 @@ def load_settings() -> Settings:
 
 
 def save_settings(settings: Settings) -> None:
-    _settings_path().write_text(json.dumps(asdict(settings), ensure_ascii=False, indent=2))
+    _settings_path().write_text(json.dumps(asdict(settings), ensure_ascii=False, indent=2), encoding="utf-8")

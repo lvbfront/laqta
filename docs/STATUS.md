@@ -33,4 +33,8 @@ Open problems, deliberately not fixed yet, with where they live in the code (lin
 - **Agent: a finished file that's edited later is never re-uploaded.** The queue is keyed by path (`agent/laqta_agent/queue_db.py`, `enqueue`), so a changed file at the same path is ignored.
 - **No "processed" or "published" timestamps:** `photos` has no `processed_at`/`updated_at`, and `published` has none unless a moderator acted. `scripts/camera_check` shows when it observed those states.
 - **Camera day:** unverified until the visit: whether the ZV-E10's own shutter button transfers during PC Remote, and the Wi-Fi transfer time (docs/CAMERA_DAY.md, steps 7–8). Camera model (original vs II) not yet known.
-- **Windows agent:** never built or run on Windows. No `.exe` exists (agent/README.md, "Building").
+- **Windows agent:** never built or run on Windows. No `.exe` exists (agent/README.md, "Building"). Fixed 2026-10-06: settings are read and written as UTF-8 (`agent/laqta_agent/settings.py:32,43`), so an Arabic folder name no longer crashes on English-locale Windows (`agent/tests/test_settings_encoding.py`). Still untested on Windows:
+  - watchdog's Windows backend
+  - reading files the camera software still has open
+  - how Arabic text renders in Tk
+  - the PyInstaller build (`build_windows.bat` and the CI workflow have never run)
