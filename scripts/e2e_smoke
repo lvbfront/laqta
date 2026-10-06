@@ -1,0 +1,213 @@
+#!/usr/bin/env python3
+"""End-to-end smoke test, no camera: photo dropped in a folder -> the real
+laqta_agent (headless) -> upload -> worker -> guest selfie through the real
+guest web page in headless Chromium, its camera fed from a file -> match.
+
+Setup (register, create event, pairing code) uses the dashboard API, the
+same calls the dashboard makes. The photo path and the guest path make no
+direct API calls: photos go in through the agent, the selfie goes in
+through /e/<qr_token>. Postgres is only read, to wait on and check state.
+
+Needs: docker compose stack + web dev server up (docs/RUN_LOCAL.md),
+agent/.venv, scripts/.venv (playwright), ffmpeg.
+    scripts/.venv/bin/python scripts/e2e_smoke
+"""
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.request
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from playwright.sync_api import sync_playwright
+
+ROOT = Path(__file__).resolve().parent.parent
+API = os.environ.get("LAQTA_API_URL", "http://localhost:8000")
+WEB = os.environ.get("LAQTA_WEB_URL", "http://localhost:3000")
+
+
+def step(msg: str) -> None:
+    print(f"[{datetime.now():%H:%M:%S}] {msg}", flush=True)
+
+
+def api(method: str, path: str, body: dict | None = None, token: str | None = None) -> dict:
+    req = urllib.request.Request(f"{API}{path}", method=method, data=json.dumps(body).encode() if body else None)
+    req.add_header("Content-Type", "application/json")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read())
+
+
+def sql(query: str) -> list[list[str]]:
+    out = subprocess.run(
+        ["docker", "compose", "exec", "-T", "postgres", "psql", "-U", "laqta", "-d", "laqta", "-At", "-F", "\t", "-c", query],
+        cwd=ROOT, check=True, capture_output=True, text=True,
+    ).stdout
+    return [line.split("\t") for line in out.splitlines() if line]
+
+
+def fixture(expr: str) -> bytes:
+    """Test images built inside the api container from the face images
+    insightface ships (api/tests/image_fixtures.py) -- nothing from pics/.
+    """
+    code = (
+        "import sys, cv2, insightface, os; from tests.image_fixtures import *; "
+        "d = os.path.join(os.path.dirname(insightface.__file__), 'data', 'images'); "
+        f"sys.stdout.buffer.write({expr})"
+    )
+    return subprocess.run(
+        ["docker", "compose", "exec", "-T", "api", "python", "-c", code], cwd=ROOT, check=True, capture_output=True
+    ).stdout
+
+
+def wait_for(what: str, fn, timeout: float = 180):  # noqa: ANN001
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        result = fn()
+        if result:
+            return result
+        time.sleep(1)
+    raise SystemExit(f"FAIL: timed out after {timeout}s waiting for {what}")
+
+
+def wait_processed(event_id: str, name: str, before: set[str]) -> tuple[str, int]:
+    """Returns (photo_id, face_count) for the one new 'ready' photo."""
+
+    def check():  # noqa: ANN202
+        rows = sql(
+            f"SELECT id, status, (SELECT count(*) FROM faces f WHERE f.photo_id = p.id) "
+            f"FROM photos p WHERE event_id = '{event_id}'"
+        )
+        new = [r for r in rows if r[0] not in before]
+        if any(r[1] == "failed" for r in new):
+            raise SystemExit(f"FAIL: worker marked {name} as failed (docker compose logs worker)")
+        ready = [r for r in new if r[1] == "ready"]
+        return (ready[0][0], int(ready[0][2])) if ready else None
+
+    return wait_for(f"{name} to be uploaded and processed", check)
+
+
+def guest_selfie(qr_token: str, selfie_jpeg: bytes, work: Path, label: str) -> tuple[dict, list[str]]:
+    """Runs the real guest flow with Chromium's camera fed from a still
+    image. Returns (the /match response the page got, gallery img srcs that
+    actually loaded).
+    """
+    jpg, y4m = work / f"{label}.jpg", work / f"{label}.y4m"
+    jpg.write_bytes(selfie_jpeg)
+    subprocess.run(
+        ["ffmpeg", "-loglevel", "error", "-y", "-loop", "1", "-i", str(jpg), "-t", "2", "-r", "10",
+         "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", str(y4m)],
+        check=True,
+    )
+    with sync_playwright() as p:
+        browser = p.chromium.launch(args=[
+            "--use-fake-ui-for-media-stream",
+            "--use-fake-device-for-media-stream",
+            f"--use-file-for-fake-video-capture={y4m}",
+        ])
+        page = browser.new_context(locale="en-US").new_page()
+        page.goto(f"{WEB}/e/{qr_token}")
+        page.locator("input[type=checkbox]").check()
+        page.locator("button:enabled", has_text="متابعة").or_(page.locator("button:enabled", has_text="Continue")).click()
+        page.locator("video").wait_for()
+        page.wait_for_function("document.querySelector('video').videoWidth > 0")
+        page.get_by_role("button", name="التقاط").or_(page.get_by_role("button", name="Capture")).click()
+        with page.expect_response(lambda r: r.url.endswith("/match") and r.request.method == "POST") as resp_info:
+            page.get_by_text("استخدام هذه الصورة").or_(page.get_by_text("Use this photo")).click()
+        resp = resp_info.value
+        body = resp.json()
+        if resp.status != 200:
+            browser.close()
+            raise SystemExit(f"FAIL: guest /match returned {resp.status}: {body}")
+        loaded: list[str] = []
+        if body["matches"]:
+            page.wait_for_function(
+                f"[...document.querySelectorAll('img')].filter(i => i.complete && i.naturalWidth > 0).length >= {len(body['matches'])}",
+                timeout=30_000,
+            )
+            loaded = page.eval_on_selector_all("img", "els => els.filter(i => i.naturalWidth > 0).map(i => i.src)")
+        browser.close()
+        return body, loaded
+
+
+def main() -> None:
+    stamp = int(time.time())
+    work = Path(tempfile.mkdtemp(prefix="laqta-e2e-"))
+    inbox = work / "inbox"
+    inbox.mkdir()
+    agent = None
+    try:
+        step("setup: register + create event + pairing code (dashboard API)")
+        auth = api("POST", "/api/auth/register",
+                   {"org_name": f"E2E {stamp}", "email": f"e2e-{stamp}@example.com", "password": "e2e-password-123"})
+        token, org_id = auth["session_token"], auth["user"]["org_id"]
+        ends = (datetime.now(timezone.utc) + timedelta(hours=6)).isoformat()
+        event = api("POST", f"/api/organizations/{org_id}/events",
+                    {"name_ar": "اختبار", "name_en": f"E2E {stamp}", "ends_at": ends}, token)
+        event_id, qr_token = event["id"], event["qr_token"]
+        code = api("POST", f"/api/events/{event_id}/agent-pairing-codes", token=token)["code"]
+        step(f"event {event_id} qr={qr_token} pairing={code}")
+
+        step("start laqta_agent (headless) and pair")
+        agent = subprocess.Popen(
+            [str(ROOT / "agent/.venv/bin/python"), "-m", "laqta_agent.headless",
+             "--folder", str(inbox), "--queue-db", str(work / "queue.sqlite3"), "--pair-code", code],
+            cwd=ROOT / "agent", env={**os.environ, "LAQTA_API_URL": API},
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        )
+        for line in agent.stdout:
+            if line.startswith("WATCHING"):
+                break
+        else:
+            raise SystemExit("FAIL: agent exited before watching")
+
+        step("drop event photo (6 faces) into a camera-style subfolder")
+        (inbox / "100MSDCF").mkdir()
+        (inbox / "100MSDCF" / "DSC00001.JPG").write_bytes(fixture("multi_face_photo_jpeg()"))
+        face_photo, n_faces = wait_processed(event_id, "DSC00001.JPG", set())
+        step(f"processed {face_photo}: {n_faces} faces")
+        assert n_faces >= 1, "FAIL: no faces embedded for the event photo"
+
+        step("drop a photo with nobody in it")
+        (inbox / "100MSDCF" / "DSC00002.JPG").write_bytes(fixture("no_face_photo_jpeg(1200, 800)"))
+        empty_photo, n_empty = wait_processed(event_id, "DSC00002.JPG", {face_photo})
+        step(f"processed {empty_photo}: {n_empty} faces")
+        assert n_empty == 0, f"FAIL: {n_empty} faces found in the empty photo"
+
+        step("guest: selfie of someone in the event photo, via the camera on /e/<qr>")
+        body, loaded = guest_selfie(qr_token, fixture("single_face_selfie_jpeg()"), work, "selfie")
+        ids = [m["photo_id"] for m in body["matches"]]
+        step(f"matches: {body['matches']}")
+        assert face_photo in ids, "FAIL: the photo the guest is in did not come back"
+        assert empty_photo not in ids, "FAIL: the empty photo came back as a match"
+        assert any(face_photo in src for src in loaded), "FAIL: matched photo not visible in the guest gallery"
+        step("PASS: guest got their photo, and it rendered in the gallery")
+
+        step("guest: selfie of someone who is in no photo")
+        # 112px aligned crop: upscaled (nearest, so the blur check passes) and padded so the detector finds it.
+        stranger = fixture(
+            "cv2.imencode('.jpg', cv2.copyMakeBorder(cv2.resize(cv2.imread(os.path.join(d, 'Tom_Hanks_54745.png')), "
+            "None, fx=2, fy=2, interpolation=cv2.INTER_NEAREST), 150, 150, 150, 150, cv2.BORDER_REPLICATE))[1].tobytes()"
+        )
+        body, _ = guest_selfie(qr_token, stranger, work, "stranger")
+        step(f"matches: {body['matches']}")
+        assert body["matches"] == [], "FAIL: a stranger got matches"
+        step("PASS: stranger got no matches")
+        print("E2E SMOKE: PASS")
+    finally:
+        if agent:
+            agent.terminate()
+            agent.wait(timeout=10)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except AssertionError as exc:
+        sys.exit(str(exc))

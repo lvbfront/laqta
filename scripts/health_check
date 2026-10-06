@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Is every Laqta service up, and can each one reach what it depends on?
+# Exit code = number of failed checks. Run from anywhere:
+#   scripts/health_check
+cd "$(dirname "$0")/.." || exit 1
+fails=0
+ok()   { printf '  \033[32mOK\033[0m    %s\n' "$1"; }
+bad()  { printf '  \033[31mFAIL\033[0m  %s\n' "$1"; fails=$((fails + 1)); }
+warn() { printf '  \033[33mWARN\033[0m  %s\n' "$1"; }
+check() { local name=$1; shift; if out=$("$@" 2>&1); then ok "$name"; else bad "$name -- $(echo "$out" | tail -1)"; fi; }
+env_val() { grep -E "^$1=" "$2" 2>/dev/null | tail -1 | cut -d= -f2-; }
+
+echo "Docker"
+check "docker daemon" docker info
+for svc in postgres redis minio api worker ftps purge-scheduler; do
+  check "container $svc running" sh -c "docker compose ps --status running --services | grep -qx $svc"
+done
+
+echo "Postgres (localhost:$(env_val POSTGRES_PORT .env))"
+check "accepting connections" docker compose exec -T postgres pg_isready -U laqta
+check "pgvector extension installed" sh -c "docker compose exec -T postgres psql -U laqta -d laqta -Atc \"SELECT 1 FROM pg_extension WHERE extname='vector'\" | grep -qx 1"
+check "migrations at head" sh -c "docker compose exec -T api alembic current 2>/dev/null | grep -q '(head)'"
+
+echo "Redis / MinIO"
+check "redis PING" sh -c "docker compose exec -T redis redis-cli ping | grep -qx PONG"
+check "minio live (localhost:9000)" curl -sf http://localhost:9000/minio/health/live
+
+echo "API (http://localhost:8000)"
+check "GET /health" curl -sf http://localhost:8000/health
+check "api -> postgres, redis, minio bucket" docker compose exec -T api python -c "
+from sqlalchemy import text
+from app.db import SessionLocal
+from app.storage.minio_client import get_client
+from app.config import settings
+from app.workers.queue import get_photo_processing_queue
+SessionLocal().execute(text('SELECT 1'))
+get_photo_processing_queue().connection.ping()
+get_client().head_bucket(Bucket=settings.minio_bucket)"
+
+echo "Face worker"
+check "rq worker listening on photo_processing" sh -c "docker compose exec -T worker sh -c 'rq info -u \$REDIS_URL --only-workers' | grep -q photo_processing"
+check "buffalo_l model files present" docker compose exec -T worker sh -c "ls /root/.insightface/models/buffalo_l/det_10g.onnx /root/.insightface/models/buffalo_l/w600k_r50.onnx"
+check "worker -> postgres, minio bucket" docker compose exec -T worker python -c "
+from sqlalchemy import text
+from app.db import SessionLocal
+from app.storage.minio_client import get_client
+from app.config import settings
+SessionLocal().execute(text('SELECT 1'))
+get_client().head_bucket(Bucket=settings.minio_bucket)"
+failed_jobs=$(docker compose exec -T worker sh -c 'rq info -u $REDIS_URL --only-workers' 2>/dev/null | grep -o '[0-9]* failed' | head -1)
+[ -n "$failed_jobs" ] && [ "${failed_jobs%% *}" != 0 ] && warn "worker reports $failed_jobs job(s) -- docker compose logs worker"
+
+echo "Web (http://localhost:3000)"
+check "GET /" curl -sf -o /dev/null http://localhost:3000/
+web_api=$(env_val NEXT_PUBLIC_API_URL web/.env.local)
+check "web's NEXT_PUBLIC_API_URL ($web_api) reachable" curl -sf "${web_api:-http://localhost:8000}/health"
+public=$(env_val MINIO_PUBLIC_ENDPOINT .env)
+check "presigned image host (MINIO_PUBLIC_ENDPOINT=${public:-unset}) reachable" curl -sf -o /dev/null "http://${public:-localhost:9000}/minio/health/live"
+
+echo "laqta_agent"
+check "agent venv imports" agent/.venv/bin/python -c "import sys; sys.path.insert(0, 'agent'); import laqta_agent.watcher, laqta_agent.uploader"
+check "agent -> API (${LAQTA_API_URL:-http://localhost:8000})" curl -sf "${LAQTA_API_URL:-http://localhost:8000}/health"
+if pgrep -f "laqta_agent\.(main|headless)" >/dev/null; then ok "agent process running"; else warn "agent process not running (start it: docs/RUN_LOCAL.md step 5)"; fi
+
+echo
+[ "$fails" -eq 0 ] && echo "ALL CHECKS PASSED" || echo "$fails CHECK(S) FAILED"
+exit "$fails"

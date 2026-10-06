@@ -1,0 +1,189 @@
+#!/usr/bin/env python3
+"""Camera day: watch the folder Imaging Edge saves into and show every new
+JPEG's trip through Laqta, one line per hop, with timestamps and the delay
+since the file landed. Ctrl-C to stop. Stdlib only.
+
+    python3 scripts/camera_check                       # GUI agent's folder + queue
+    python3 scripts/camera_check --folder ~/Pictures/laqta-inbox --queue-db /path/q.sqlite3
+
+Hop             | timestamp source
+----------------|------------------------------------------------------------
+landed          | file mtime when first seen (all +deltas count from here)
+agent picked up | agent queue uploads.created_at (stable + MD5'd + enqueued)
+uploaded        | agent queue uploads.updated_at when status='done' -- last
+                | status change; the agent has no dedicated uploaded_at
+server received | photos.created_at (ingest transaction start)
+processed       | NONE in the code: photos has no processed_at/updated_at,
+                | and faces.created_at is the worker transaction's *start*.
+                | Shown as the time this script first saw status='ready'.
+guest-visible   | NONE: published has no timestamp (moderated_at is only set
+                | by a moderator). Shown as when this script first saw it.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import sqlite3
+import subprocess
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+GUI_DATA = Path.home() / "Library" / "Application Support" / "Laqta Agent"
+JPEG = {".jpg", ".jpeg"}
+RAW = {".arw", ".cr2", ".cr3", ".nef", ".dng", ".raf", ".orf", ".rw2"}
+
+
+def ts(dt: datetime | float | None) -> str:
+    if dt is None:
+        return "--"
+    if isinstance(dt, float):
+        dt = datetime.fromtimestamp(dt, timezone.utc)
+    return dt.astimezone().strftime("%H:%M:%S.%f")[:-4]
+
+
+def parse(s: str) -> datetime:
+    return datetime.fromisoformat(s.replace(" ", "T") if "T" not in s else s)
+
+
+def agent_rows(queue_db: Path) -> list[sqlite3.Row]:
+    if not queue_db.exists():
+        return []
+    conn = sqlite3.connect(f"file:{queue_db}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    try:
+        return conn.execute("SELECT path, md5, status, attempts, last_error, created_at, updated_at FROM uploads").fetchall()
+    except sqlite3.Error:
+        return []
+    finally:
+        conn.close()
+
+
+def server_rows(md5s: set[str]) -> dict[str, dict]:
+    if not md5s:
+        return {}
+    q = (
+        "SELECT json_agg(json_build_object('md5', md5, 'created_at', created_at, 'status', status, "
+        "'published', published, 'faces', (SELECT count(*) FROM faces f WHERE f.photo_id = p.id))) "
+        f"FROM photos p WHERE md5 IN ({','.join(repr(m) for m in md5s)})"
+    )
+    try:
+        out = subprocess.run(
+            ["docker", "compose", "exec", "-T", "postgres", "psql", "-U", "laqta", "-d", "laqta", "-At", "-c", q],
+            cwd=ROOT, capture_output=True, text=True, timeout=10,
+        ).stdout.strip()
+    except subprocess.TimeoutExpired:
+        return {}
+    return {r["md5"]: r for r in json.loads(out)} if out and out != "" else {}
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--folder", type=Path)
+    parser.add_argument("--queue-db", type=Path, default=GUI_DATA / "queue.sqlite3")
+    parser.add_argument("--all", action="store_true", help="also show files that were already there at start")
+    args = parser.parse_args()
+
+    folder = args.folder
+    if folder is None:
+        try:
+            folder = Path(json.loads((GUI_DATA / "settings.json").read_text())["folder"])
+        except (OSError, KeyError, json.JSONDecodeError, TypeError):
+            raise SystemExit("No --folder given and the GUI agent has no folder set yet.")
+    folder = folder.expanduser().resolve()
+    started = 0.0 if args.all else time.time()
+    print(f"Watching {folder}\nAgent queue {args.queue_db}{'' if args.queue_db.exists() else ' (not created yet)'}")
+    print("Take a shot. Ctrl-C to stop.\n")
+
+    seen: dict[Path, dict] = {}  # path -> {mtime, md5, hops: set}
+
+    def say(path: Path, hop: str, when: str, extra: str = "") -> None:
+        print(f"{ts(time.time())}  {path.relative_to(folder)}  {hop:<16} at {when}{extra}", flush=True)
+        seen[path]["hops"].add(hop)
+
+    while True:
+        for path in folder.rglob("*"):
+            ext = path.suffix.lower()
+            if path in seen or not path.is_file() or path.name.startswith("."):
+                continue
+            try:
+                st = path.stat()
+            except OSError:
+                continue
+            if st.st_mtime < started:
+                continue
+            seen[path] = {"mtime": st.st_mtime, "md5": None, "hops": set()}
+            if ext in RAW:
+                say(path, "landed", ts(st.st_mtime), "  (RAW -- agent skips it by design)")
+                seen[path]["hops"].add("done")
+            elif ext in JPEG:
+                say(path, "landed", ts(st.st_mtime), f"  {st.st_size / 1e6:.2f} MB")
+            else:
+                say(path, "landed", ts(st.st_mtime), "  (not a JPEG -- agent ignores it)")
+                seen[path]["hops"].add("done")
+
+        live = {p: s for p, s in seen.items() if "done" not in s["hops"]}
+        by_path = {r["path"]: r for r in agent_rows(args.queue_db)}
+        by_md5 = {r["md5"]: r for r in by_path.values()}
+        for path, s in live.items():
+            # Our own MD5 of the finished file, not the agent's: the server
+            # lookup must use what was actually uploaded.
+            # Re-hashed whenever size/mtime moves: a file can sit empty or
+            # half-written for seconds before the rest arrives.
+            try:
+                st = path.stat()
+                if st.st_size and (st.st_mtime, st.st_size) != s.get("sig") and time.time() - st.st_mtime > 3:
+                    s["sig"] = (st.st_mtime, st.st_size)
+                    s["md5"] = hashlib.md5(path.read_bytes()).hexdigest()
+            except OSError:
+                continue
+            row = by_path.get(str(path)) or by_md5.get(s["md5"])
+            if row is None:
+                continue
+            land = s["mtime"]
+            if "picked up" not in s["hops"]:
+                t = parse(row["created_at"])
+                say(path, "picked up", ts(t), f"  +{t.timestamp() - land:.1f}s")
+            if row["status"] == "done" and "uploaded" not in s["hops"]:
+                t = parse(row["updated_at"])
+                say(path, "uploaded", ts(t), f"  +{t.timestamp() - land:.1f}s")
+            if row["status"] == "failed" and row["attempts"] != s.get("fail_attempts"):
+                s["fail_attempts"] = row["attempts"]
+                print(f"{ts(time.time())}  {path.relative_to(folder)}  UPLOAD FAILED    "
+                      f"attempt {row['attempts']}: {row['last_error']}", flush=True)
+
+        server = server_rows({s["md5"] for s in live.values() if s["md5"]})
+        for path, s in live.items():
+            row = server.get(s["md5"])
+            if row is None:
+                continue
+            land = s["mtime"]
+            if "server received" not in s["hops"]:
+                t = parse(row["created_at"])
+                if t.timestamp() < land - 1:
+                    say(path, "server received", ts(t), "  same content was uploaded earlier -- not stored twice")
+                    s["hops"].add("done")
+                    continue
+                say(path, "server received", ts(t), f"  +{t.timestamp() - land:.1f}s")
+            if row["status"] == "ready" and "processed" not in s["hops"]:
+                say(path, "processed", f"~{ts(time.time())} (seen)",
+                    f"  +{time.time() - land:.1f}s  {row['faces']} face(s) embedded")
+            if row["status"] == "failed" and "processed" not in s["hops"]:
+                say(path, "processed", ts(time.time()), "  WORKER FAILED -- docker compose logs worker")
+                s["hops"].add("done")
+            if row["status"] == "ready" and row["published"] and "guest-visible" not in s["hops"]:
+                note = "" if row["faces"] else "  (published, but 0 faces -- no selfie can ever match it)"
+                say(path, "guest-visible", f"~{ts(time.time())} (seen)", f"  +{time.time() - land:.1f}s{note}")
+                s["hops"].add("done")
+            elif row["status"] == "ready" and not row["published"] and "unpublished" not in s["hops"]:
+                say(path, "unpublished", ts(time.time()), "  waiting for a moderator (strict event)")
+        time.sleep(1)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass

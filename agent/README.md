@@ -31,6 +31,11 @@ here needs PyInstaller; see "Building" further down only when you
 actually need a distributable `.app`/`.exe` for someone who isn't
 running from a checked-out copy of this repo.
 
+Without the window (scripts, terminal use): `python -m laqta_agent.headless
+--folder DIR --queue-db FILE --pair-code CODE` runs the same watcher, queue
+and uploader, keeping the token in memory instead of the keychain -- see
+`laqta_agent/headless.py` and `docs/RUN_LOCAL.md`.
+
 ## Pairing (how a photographer connects it, in one sentence)
 
 An organizer clicks "Pair camera agent" on an event's dashboard card,
@@ -54,6 +59,11 @@ path included). `tkinter` is required to import `laqta_agent.gui`, which
 some of these tests import transitively -- on Homebrew Python, install it
 via `brew install python-tk@3.11` if you get `ModuleNotFoundError:
 _tkinter`.
+
+`test_watcher_scenarios.py` (~45 s) runs the real watcher, queue and
+uploader against a real folder with only the HTTP side faked: a slowly
+written file, an empty placeholder file, new subfolders, RAW+JPEG pairs,
+duplicates/renames, a 50-file burst, and a crash mid-batch.
 
 ## Building
 
