@@ -1,4 +1,8 @@
 services:
+  # Postgres, Redis and MinIO publish on 127.0.0.1 only: on a shared Wi-Fi
+  # or phone hotspot (camera day) nothing but the API and web should be
+  # reachable, and these three run with dev default credentials. The API
+  # and worker reach them over the compose network, unaffected by this.
   postgres:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
@@ -7,7 +11,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-laqta_dev_password}
       POSTGRES_DB: ${POSTGRES_DB:-laqta}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -20,7 +24,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redisdata:/data
     healthcheck:
@@ -37,8 +41,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-laqta}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-laqta_dev_password}
     ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - miniodata:/data
     healthcheck:

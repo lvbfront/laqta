@@ -71,7 +71,7 @@ Who can read them:
 
 No HTTP endpoint returns embeddings (the only use in `api/app/api` is inside `match.py`).
 
-**In dev, the Postgres, Redis (no password) and MinIO ports are published on all interfaces** (`0.0.0.0:5433`, `:6379`, `:9000`). On a shared hotspot at an event, other devices on that network can reach them with the default credentials. See docs/CAMERA_DAY.md.
+In dev, Postgres, Redis (no password) and MinIO run with default credentials but are published on `127.0.0.1` only (`docker-compose.yml`), so other devices on the same Wi-Fi or hotspot can't reach them; `scripts/health_check` checks this.
 
 ## Related gaps (not changed here)
 

@@ -74,15 +74,9 @@ Pairing info is deleted if the camera is initialized ([E10-PCR]).
 ## Laqta settings for the hotspot
 
 - **Photographer-side only (camera → Mac → upload):** nothing to change. Everything uses `localhost`.
-- **Guest selfie from a phone on the hotspot:**
-  1. Set `MINIO_PUBLIC_ENDPOINT=<Mac hotspot IP>:9000` in `.env`, then run `docker compose up -d api`.
-  2. Set `NEXT_PUBLIC_API_URL=http://<Mac hotspot IP>:8000` in `web/.env.local`, then restart `npm run dev`.
-  3. Open `http://<Mac IP>:3000/e/<qr_token>` on the phone.
-
-  Phone browsers only open the camera on `https://` or `localhost`. Over plain `http://<IP>` the page shows its "camera unavailable" message and the **upload-a-photo** fallback. That still tests matching, but not the live camera. This is general browser behaviour, not something tested here on a phone.
-
-  The simplest guest test is on the **Mac's own browser** at `http://localhost:3000/e/<qr_token>`, which uses the Mac's webcam.
-- **Security:** in dev, Docker publishes Postgres (`5433`), Redis (`6379`, no password) and MinIO (`9000/9001`) on all interfaces with default credentials. Use **your own** hotspot, not venue Wi-Fi.
+- **Guest selfie: do it on the Mac**, at `http://localhost:3000/e/<qr_token>` in the Mac's own browser (uses the Mac's webcam).
+- **A phone on the hotspot can't run the guest flow in dev.** Postgres, Redis and MinIO are bound to `127.0.0.1` (`docker-compose.yml`), so nothing on the hotspot can reach them. Gallery images are presigned MinIO URLs that the guest's browser loads directly from MinIO, so a phone would get broken images. Separately, phone browsers only open the camera on `https://` or `localhost`. Testing from a phone needs either images served through the API or an HTTPS setup; neither is built.
+- **What the hotspot can reach:** the API (`:8000`), the web dev server (`:3000`) and FTPS (`:2121`, `:30000-30009`; password-protected per event, unused by the ZV-E10). `scripts/health_check` checks this from the Mac's LAN IP. Still, use **your own** hotspot, not venue Wi-Fi.
 
 ## Fallbacks, ranked
 
@@ -121,7 +115,6 @@ Imaging Edge Remote is installed and allowed under Local Network, and `/Users/aw
 | 7 | **Test shot from the camera's own shutter button.** This answers the unverified question. | Same lines as step 6 | If nothing "lands": the body button doesn't transfer in this mode. Shoot from Remote, or rely on the card and SD copy. **Write down the answer.** |
 | 8 | Burst: 10 quick shots. | 10 × guest-visible, nothing failed | Note the slowest "landed" delay: that's the Wi-Fi transfer time Sony doesn't document. |
 | 9 | **Guest selfie:** on the Mac browser open `http://localhost:3000/e/<qr_token>` (QR token from the dashboard), tick consent, take the selfie. | Gallery shows the step-6/7/8 photos you're in | `no_face_detected` / `selfie_too_blurry`: better light, hold still. Zero matches: check step 6 showed faces ≥ 1. If it still fails, **stop and tell me. Don't change the threshold.** |
-| 10 | Optional: repeat the selfie from a phone on the hotspot ("Laqta settings for the hotspot"). | Same gallery | Broken images mean `MINIO_PUBLIC_ENDPOINT` is wrong. No camera prompt means it's plain http (expected); use upload. |
 
 ### What each camera_check hop means, and what to try
 

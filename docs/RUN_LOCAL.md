@@ -6,7 +6,7 @@ Everything is served on `http://localhost`. Verified on this Mac (Apple Silicon,
 |---|---|---|
 | API (FastAPI) | http://localhost:8000 (`/health`) | Docker `api` |
 | Face worker (RQ + InsightFace buffalo_l) | n/a | Docker `worker` |
-| Postgres 16 + pgvector | localhost:**5433** (5432 is taken by a native Postgres on this Mac) | Docker `postgres` |
+| Postgres 16 + pgvector | 127.0.0.1:**5433** (5432 is taken by a native Postgres on this Mac) | Docker `postgres` |
 | Redis | localhost:6379 | Docker `redis` |
 | MinIO | http://localhost:9000 (console :9001) | Docker `minio` |
 | FTPS ingest, purge scheduler | :2121 / n/a | Docker `ftps`, `purge-scheduler` |
@@ -30,7 +30,7 @@ POSTGRES_PORT=5433                       # a native Postgres already owns 5432 o
 MINIO_PUBLIC_ENDPOINT=localhost:9000     # host the browser loads photo URLs from
 ```
 
-`MINIO_PUBLIC_ENDPOINT` must be an address the guest's browser can reach. `localhost:9000` only works for a browser on this Mac. A phone on the same Wi-Fi or hotspot needs the Mac's current IP; see docs/CAMERA_DAY.md. A stale IP here gives broken images in the guest gallery and no other error.
+`MINIO_PUBLIC_ENDPOINT` must be an address the guest's browser can reach. MinIO is published on `127.0.0.1` only, so in dev that means `localhost:9000`, and guests can only be tested from this Mac's browser (see docs/CAMERA_DAY.md). A wrong value gives broken images in the guest gallery and no other error.
 
 ```bash
 cp web/.env.local.example web/.env.local     # NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -84,7 +84,7 @@ You can run the agent two ways:
 scripts/health_check
 ```
 
-This checks every container, Postgres (pgvector, migrations at head), Redis, and MinIO. It checks that the API and the worker can each reach Postgres, Redis and the bucket, that the buffalo_l model files are present, that the web server is up, that the web's API URL and the presigned-image host are reachable, and that the agent can import and reach the API. The exit code is the number of failed checks. A missing agent *process* is only a WARN.
+This checks every container, Postgres (pgvector, migrations at head), Redis, and MinIO. It checks that the API and the worker can each reach Postgres, Redis and the bucket, that the buffalo_l model files are present, that the web server is up, that the web's API URL and the presigned-image host are reachable, that Postgres, Redis and MinIO are **not** reachable from this Mac's LAN IP while the API is, and that the agent can import and reach the API. The exit code is the number of failed checks. A missing agent *process* is only a WARN.
 
 ## 6. End-to-end smoke test (no camera)
 
