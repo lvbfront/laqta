@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
@@ -16,7 +16,6 @@ from app.db import get_db
 from app.models.enums import MatchMode
 from app.models.event import Event
 from app.models.guest import Guest
-from app.models.guest_face import GuestFace
 from app.models.match import Match
 from app.models.photo import Photo
 from app.models.photo_code import PhotoCode
@@ -108,7 +107,8 @@ async def match_selfie(
     """Selfie in, matched photos out. The selfie is never written to disk,
     MinIO, a temp file, or a log line -- it's decoded in memory, embedded,
     and every reference to its bytes goes out of scope when this function
-    returns. See tests/test_selfie_never_persisted.py, which patches the
+    returns. Its embedding isn't stored either (no guest_faces row): it is
+    searched once and discarded the same way. See tests/test_selfie_never_persisted.py, which patches the
     storage client and the filesystem's own spill-to-disk path and fails
     if either is touched.
     """
@@ -161,14 +161,8 @@ async def match_selfie(
     db.add(guest)
     db.flush()
 
-    db.add(
-        GuestFace(
-            guest_id=guest.id,
-            embedding=face.embedding,
-            expires_at=datetime.now(timezone.utc) + timedelta(days=settings.guest_face_retention_days),
-        )
-    )
-
+    # face.embedding is used for this one search and never stored -- like
+    # the selfie image, it goes out of scope when this request returns.
     raw_results = search_faces(
         db,
         event_id=event_id,
@@ -262,7 +256,7 @@ def match_by_code(
     if not code:
         raise HTTPException(status_code=422, detail={"code": "empty_code", "message": "Enter your code."})
 
-    # No consent flag, no guest_faces row -- there is no biometric
+    # No consent flag -- there is no biometric
     # collection happening here to consent to. A Guest row still gets
     # created (session/audit trail, and matches needs a guest_id to hang
     # off of), just without anything selfie-shaped attached to it.

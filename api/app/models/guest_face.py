@@ -18,10 +18,10 @@ if TYPE_CHECKING:
 
 
 class GuestFace(Base, UUIDPKMixin, TimestampMixin):
-    """The guest's selfie, reduced to a vector — this row is the only trace
-    of the selfie that ever exists. Purged by the scheduled purge job once
-    expires_at passes (event end + retention window), hard-deleted with an
-    audit_log entry.
+    """No longer written. app/api/routes/match.py used to store the selfie's
+    embedding here, but nothing ever read it back, so it now searches with
+    the embedding and discards it (migration 7f05f01ae4fa deleted the rows
+    stored before). Kept, with its purge path, until the table is dropped.
     """
 
     __tablename__ = "guest_faces"

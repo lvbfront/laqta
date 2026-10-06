@@ -40,7 +40,6 @@ class Settings(BaseSettings):
 
     # --- Matching / face pipeline ---
     match_threshold: float = 0.38
-    guest_face_retention_days: int = 30
     face_model_pack: str = "buffalo_l"
     onnxruntime_provider: str = "CPUExecutionProvider"
     min_face_bbox_px: int = 40

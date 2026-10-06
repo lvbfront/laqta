@@ -40,7 +40,9 @@ def test_match_finds_published_photo_with_matching_face(client, db_session):
     guest = db_session.query(Guest).filter(Guest.session_token == body["guest_session_token"]).first()
     assert guest is not None
     assert guest.event_id == event.id
-    assert db_session.query(GuestFace).filter(GuestFace.guest_id == guest.id).count() == 1
+    # The selfie's embedding is used for this search and then dropped --
+    # nothing selfie-derived is stored (a guest_faces row was never read again).
+    assert db_session.query(GuestFace).count() == 0
     assert db_session.query(Match).filter(Match.guest_id == guest.id).count() == 1
 
 

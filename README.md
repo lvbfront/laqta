@@ -178,8 +178,9 @@ laqta/
   guest's own delivery API calls. **No selfie image or plaintext phone number
   is representable in this schema anywhere** — only a hashed phone and a
   vector.
-- `guest_faces` — the selfie's embedding + `expires_at`. This row is the only
-  trace of a selfie that ever exists.
+- `guest_faces` — no longer written: the selfie's embedding is used for one
+  search and discarded, never stored (migration `7f05f01ae4fa` deleted the
+  rows stored before). The table and its purge path remain until dropped.
 - `matches` — guest × photo, max cosine score across that photo's faces,
   optional `feedback` (`not_me` | `remove_requested`).
 - `downloads` — every delivery, logged.
@@ -393,7 +394,7 @@ On success: embeds the selfie, `app.services.face_search.search_faces`
 **published** photos (a plain post-filter on the result set, deliberately
 *not* folded into the search query itself — doing that would reintroduce
 the filtered-ANN recall issue `faces.event_id` was denormalized to avoid),
-creates `guests` + `guest_faces` rows (`expires_at` = now + `GUEST_FACE_RETENTION_DAYS`),
+creates a `guests` row (the selfie's embedding is not stored),
 persists one `matches` row per surfaced photo, and returns
 `{guest_session_token, matches: [{photo_id, score}, ...]}` sorted descending.
 
@@ -539,7 +540,7 @@ token, and the `match` endpoint URL to hit once photos are processed.
 ## Environment variables
 
 See [`.env.example`](.env.example) for the full, current list (Postgres/Redis/MinIO
-connection settings, `MATCH_THRESHOLD`, `GUEST_FACE_RETENTION_DAYS`, face-pipeline
+connection settings, `MATCH_THRESHOLD`, face-pipeline
 tuning, blur/upload-size limits, `SIGNED_URL_TTL_SECONDS`).
 
 ## Running tests
