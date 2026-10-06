@@ -9,7 +9,7 @@ Everything is served on `http://localhost`. Verified on this Mac (Apple Silicon,
 | Postgres 16 + pgvector | 127.0.0.1:**5433** (5432 is taken by a native Postgres on this Mac) | Docker `postgres` |
 | Redis | localhost:6379 | Docker `redis` |
 | MinIO | http://localhost:9000 (console :9001) | Docker `minio` |
-| FTPS ingest, purge scheduler | :2121 / n/a | Docker `ftps`, `purge-scheduler` |
+| FTPS ingest, purge scheduler | 127.0.0.1:2121 (passive 30000–30009) / n/a | Docker `ftps`, `purge-scheduler` |
 | Web (Next.js) | http://localhost:3000 | host (`npm run dev`) |
 | laqta_agent | n/a | host (Python venv) |
 
@@ -84,7 +84,7 @@ You can run the agent two ways:
 scripts/health_check
 ```
 
-This checks every container, Postgres (pgvector, migrations at head), Redis, and MinIO. It checks that the API and the worker can each reach Postgres, Redis and the bucket, that the buffalo_l model files are present, that the web server is up, that the web's API URL and the presigned-image host are reachable, that Postgres, Redis and MinIO are **not** reachable from this Mac's LAN IP while the API is, and that the agent can import and reach the API. The exit code is the number of failed checks. A missing agent *process* is only a WARN.
+This checks every container, Postgres (pgvector, migrations at head), Redis, and MinIO. It checks that the API and the worker can each reach Postgres, Redis and the bucket, that the buffalo_l model files are present, that the web server is up, that the web's API URL and the presigned-image host are reachable, that Postgres, Redis, MinIO and FTPS are **not** reachable from this Mac's LAN IP while the API is, and that the agent can import and reach the API. The exit code is the number of failed checks. A missing agent *process* is only a WARN.
 
 ## 6. End-to-end smoke test (no camera)
 

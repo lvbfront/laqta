@@ -28,7 +28,6 @@ Open problems, deliberately not fixed yet, with where they live in the code (lin
 ## Other open items
 
 - **`guest_faces` table:** no longer written (selfie embeddings are discarded since 2026-10-06; the old rows were deleted by migration `7f05f01ae4fa`). The empty table, its model and its purge path remain. Decision pending: drop them.
-- **FTPS ports exposed on the LAN:** `:2121` and `:30000-30009` are still published on all interfaces (`docker-compose.yml`, `ftps` service). They're password-protected per event, and the ZV-E10 can't use FTP.
 - **Guests on a phone in dev:** gallery images are presigned MinIO URLs, and MinIO is localhost-only. Phone browsers also need HTTPS for the camera. Guest testing in dev is from the Mac's browser only.
 - **Agent: a finished file that's edited later is never re-uploaded.** The queue is keyed by path (`agent/laqta_agent/queue_db.py`, `enqueue`), so a changed file at the same path is ignored.
 - **No "processed" or "published" timestamps:** `photos` has no `processed_at`/`updated_at`, and `published` has none unless a moderator acted. `scripts/camera_check` shows when it observed those states.

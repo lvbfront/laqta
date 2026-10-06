@@ -62,7 +62,7 @@ lan_ip=$(ipconfig getifaddr en0 2>/dev/null)
 if [ -z "$lan_ip" ]; then
   warn "no LAN IP on en0 -- can't check what the hotspot can reach"
 else
-  for port in "${POSTGRES_PORT:-$(env_val POSTGRES_PORT .env)}" 6379 9000 9001; do
+  for port in "${POSTGRES_PORT:-$(env_val POSTGRES_PORT .env)}" 6379 9000 9001 2121 30000 30009; do
     if nc -z -G 1 "$lan_ip" "$port" 2>/dev/null; then bad "port $port reachable at $lan_ip (should be 127.0.0.1 only)"; else ok "port $port not reachable at $lan_ip"; fi
   done
   check "API reachable at $lan_ip:8000" curl -sf "http://$lan_ip:8000/health"

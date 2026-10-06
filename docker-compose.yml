@@ -1,7 +1,8 @@
 services:
-  # Postgres, Redis and MinIO publish on 127.0.0.1 only: on a shared Wi-Fi
-  # or phone hotspot (camera day) nothing but the API and web should be
-  # reachable, and these three run with dev default credentials. The API
+  # Postgres, Redis, MinIO and FTPS publish on 127.0.0.1 only: on a shared
+  # Wi-Fi or phone hotspot (camera day) nothing but the API and web should
+  # be reachable, and these run with dev default credentials. A real
+  # FTP-capable camera on the LAN needs FTPS rebound to 0.0.0.0. The API
   # and worker reach them over the compose network, unaffected by this.
   postgres:
     image: pgvector/pgvector:pg16
@@ -124,8 +125,8 @@ services:
       - ./api:/app
       - ftps_certs:/tmp/laqta-ftps
     ports:
-      - "${FTPS_PORT:-2121}:2121"
-      - "${FTPS_PASSIVE_PORT_START:-30000}-${FTPS_PASSIVE_PORT_END:-30009}:30000-30009"
+      - "127.0.0.1:${FTPS_PORT:-2121}:2121"
+      - "127.0.0.1:${FTPS_PASSIVE_PORT_START:-30000}-${FTPS_PASSIVE_PORT_END:-30009}:30000-30009"
     depends_on:
       postgres:
         condition: service_healthy

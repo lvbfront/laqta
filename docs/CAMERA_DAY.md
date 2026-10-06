@@ -76,7 +76,7 @@ Pairing info is deleted if the camera is initialized ([E10-PCR]).
 - **Photographer-side only (camera → Mac → upload):** nothing to change. Everything uses `localhost`.
 - **Guest selfie: do it on the Mac**, at `http://localhost:3000/e/<qr_token>` in the Mac's own browser (uses the Mac's webcam).
 - **A phone on the hotspot can't run the guest flow in dev.** Postgres, Redis and MinIO are bound to `127.0.0.1` (`docker-compose.yml`), so nothing on the hotspot can reach them. Gallery images are presigned MinIO URLs that the guest's browser loads directly from MinIO, so a phone would get broken images. Separately, phone browsers only open the camera on `https://` or `localhost`. Testing from a phone needs either images served through the API or an HTTPS setup; neither is built.
-- **What the hotspot can reach:** the API (`:8000`), the web dev server (`:3000`) and FTPS (`:2121`, `:30000-30009`; password-protected per event, unused by the ZV-E10). `scripts/health_check` checks this from the Mac's LAN IP. Still, use **your own** hotspot, not venue Wi-Fi.
+- **What the hotspot can reach:** only the API (`:8000`) and the web dev server (`:3000`). Postgres, Redis, MinIO and FTPS are bound to `127.0.0.1` (`docker-compose.yml`); `scripts/health_check` checks this from the Mac's LAN IP. Still, use **your own** hotspot, not venue Wi-Fi.
 
 ## Fallbacks, ranked
 
